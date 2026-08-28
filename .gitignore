@@ -1,0 +1,27 @@
+.DS_Store
+.codex_build/
+*.inspect.ndjson
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+.expo/
+
+# Local media/demo output
+media/
+uploads/
+KalaSetu_AI_SIH_Pitch/
