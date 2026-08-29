@@ -6,7 +6,7 @@ This document is the integration source of truth for the KalaSetu AI MVP. Avnish
 
 | Item | Value |
 | --- | --- |
-| Contract version | `0.2.0-draft` |
+| Contract version | `0.2.0-frozen` |
 | API version | `v1` |
 | Last reviewed | `2026-08-29` |
 | Backend owner | Avnish |
@@ -14,7 +14,7 @@ This document is the integration source of truth for the KalaSetu AI MVP. Avnish
 | Target clients | Flutter Android app and public web share page |
 | OpenAPI URL in development | `http://localhost:8000/docs` |
 
-The contract becomes `0.2.0-frozen` when both teammates approve it. After that point, a merged pull request is required for every contract change.
+Avnish and Amarjit reviewed and froze this contract as `0.2.0-frozen`. A merged pull request is required for every later contract change.
 
 ## MVP Boundary And Route Status
 
@@ -27,7 +27,7 @@ request OTP -> verify OTP -> create draft -> upload image -> upload voice
 
 | Priority | Capability | Endpoint group | Status |
 | --- | --- | --- | --- |
-| 1 | Service check | `GET /health` | `planned` |
+| 1 | Service check | `GET /api/v1/health` | `planned` |
 | 2 | OTP login | `/auth/*` | `planned` |
 | 3 | Artisan profile | `/me` | `planned` |
 | 4 | Catalogue drafts | `/catalog/drafts*` | `planned` |
@@ -51,7 +51,8 @@ Do not use `changed` as a route status. Contract changes are recorded in the cha
 
 - Development server: `http://localhost:8000`
 - API prefix: `/api/v1`
-- Endpoint paths below are shown relative to `/api/v1`.
+- Endpoint headings below are implementation paths relative to `/api/v1`. The effective client URL is always `development server + API prefix + endpoint path`; therefore `GET /health` is called as `GET http://localhost:8000/api/v1/health` in local development.
+- Public share pages use the separately configured frontend origin. In local development, `PUBLIC_SHARE_WEB_BASE_URL=http://localhost:3000`; it is not the API server origin.
 - JSON requests use `Content-Type: application/json`.
 - Uploads use `multipart/form-data`; the client must let its HTTP library generate the multipart boundary.
 - Successful JSON responses use `application/json; charset=utf-8`.
@@ -88,6 +89,8 @@ The mobile app may retry requests after weak connectivity. It sends a UUID in th
 The idempotency scope is the authenticated user ID when auth exists. For public routes, it is the route's stable subject: normalized phone number for OTP and public share ID for an enquiry. Within that scope, repeating the same key and request body returns the original response. Reusing a key with a different body returns `409 IDEMPOTENCY_CONFLICT`.
 
 The replay window is 60 seconds for OTP requests and 24 hours for every other operation above. The frontend must persist the key with a queued request and reuse it for network retries; generating a new key for each retry defeats duplicate protection.
+
+For OTP, the backend performs the idempotency lookup before rate-limit evaluation or OTP generation. Replaying the same key with the same request body returns the stored response, sends no new OTP, and consumes no additional rate-limit quota. A request with a new key is a new OTP attempt and counts toward the limit.
 
 ### Pagination
 
@@ -323,7 +326,7 @@ When an operation succeeds, the frontend refetches the associated draft. When it
 
 #### `GET /health`
 
-Auth: public. Success: `200 OK`.
+Effective client route: `GET /api/v1/health`. Auth: public. Success: `200 OK`.
 
 ```json
 {
@@ -342,7 +345,7 @@ For the prototype, OTP delivery may be mocked or console-logged in development. 
 
 #### `POST /auth/request-otp`
 
-Auth: public. Headers: `Idempotency-Key`. Success: `202 Accepted`. OTP idempotency lasts 60 seconds; rate limiting still applies.
+Auth: public. Headers: `Idempotency-Key`. Success: `202 Accepted`. OTP idempotency lasts 60 seconds. An idempotent replay does not consume rate-limit quota; a request with a new key does.
 
 Request:
 
@@ -566,7 +569,9 @@ Response:
 }
 ```
 
-An approved catalogue is an immutable snapshot. Later editing creates a new draft version; it does not silently alter a shared catalogue.
+The backend constructs `public_share_url` as `PUBLIC_SHARE_WEB_BASE_URL + /share/{public_share_id}`. The example uses the local frontend origin from `.env.example`; production uses the configured HTTPS web origin.
+
+An approved draft and its catalogue snapshot are immutable in the MVP. `PATCH /catalog/drafts/{draft_id}` and image PATCH requests against an approved draft return `400 INVALID_STATE`. There is no edit-approved or clone-catalogue endpoint in `v1`; to revise a product, the client creates a new independent draft through `POST /catalog/drafts` and the user supplies or confirms its values again.
 
 ### 5. Images And Enhancement
 
@@ -578,6 +583,8 @@ Multipart fields:
 
 - `image`: required JPEG, PNG, or WebP file, maximum 10 MB.
 - `is_primary`: optional boolean string, default `true`.
+
+A draft with images has exactly one primary image. The first uploaded image becomes primary even if `is_primary` is `false`. For later uploads, `is_primary: true` atomically unsets the previous primary and selects the new image; `is_primary: false` preserves the existing primary. Multiple primary images are never allowed.
 
 Response:
 
@@ -621,7 +628,9 @@ Auth: bearer. Success: `200 OK`. Response: complete updated `Draft`.
 }
 ```
 
-`selected_variant` is `original` or `enhanced`. The enhanced variant can be selected only after enhancement succeeds. This explicit action is the artisan's image approval; AI processing never selects a public image on the artisan's behalf.
+`version` is required and participates in draft version protection; a stale value returns `409 VERSION_CONFLICT`. `selected_variant` is `original` or `enhanced`. The enhanced variant can be selected only after enhancement succeeds. This explicit action is the artisan's image approval; AI processing never selects a public image on the artisan's behalf.
+
+Setting `is_primary: true` atomically unsets the previous primary. Setting it to `false` on the current primary is rejected with `400 INVALID_STATE`; because the MVP PATCH changes one image at a time, clients should promote the replacement image instead.
 
 ### 6. Voice And Listing Generation
 
@@ -819,3 +828,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | --- | --- | --- | --- |
 | 2026-08-29 | `0.2.0-draft` | behavioral | Normalized draft schemas; added status codes, lifecycle, pagination, idempotency, upload constraints, operation polling, version protection, privacy boundaries, and change governance. |
 | 2026-08-29 | `0.2.0-draft` | clarification | Defined public-route idempotency scope and OTP window, approval readiness, media status values, operation location header, and complete pricing breakdown. |
+| 2026-08-29 | `0.2.0-frozen` | clarification | Froze the reviewed contract after defining the effective health URL, OTP replay order, single-primary-image invariant, image PATCH version requirement, approved-draft immutability, and configured public share origin. |

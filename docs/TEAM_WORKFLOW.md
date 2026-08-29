@@ -35,7 +35,7 @@ Before feature coding, both teammates:
 - Read `docs/API_CONTRACT.md`, this workflow, and `.env.example`.
 - Confirm Flutter for the client and FastAPI/Python for the backend.
 - Agree on the MVP journey and the features explicitly deferred by the contract.
-- Review and freeze API contract version `0.2.0`.
+- Confirm both teammates are working from frozen API contract version `0.2.0`.
 - Confirm each local app can start and that the frontend can reach `GET /api/v1/health`.
 - Enable GitHub branch protection for `main` when repository settings allow it.
 
@@ -382,19 +382,14 @@ When frontend and backend disagree, the merged API contract wins until both appr
 
 ## Current Starting Point
 
-First, Avnish completes the setup and contract work on:
-
-```bash
-git switch backend/setup
-```
-
-Avnish opens the setup PR, Amarjit reviews the API shapes from a frontend point of view, and both freeze contract version `0.2.0`. After that PR is merged, Amarjit starts from the updated `main`:
+After the contract-freeze PR is merged, both teammates update `main` before creating or refreshing their implementation branch:
 
 ```bash
 git switch main
 git pull --ff-only origin main
-git switch -c frontend/setup
 ```
+
+Avnish begins the backend health/setup slice on `backend/health-setup`. Amarjit begins or updates his frontend setup branch from the same frozen `main`; only Amarjit pushes to that frontend branch.
 
 The first shared success is deliberately small:
 
@@ -402,4 +397,4 @@ The first shared success is deliberately small:
 2. Flutter receives its API base URL through `--dart-define`.
 3. Flutter calls the real route through its API client.
 4. Both test Android emulator and one physical phone.
-5. Setup PRs merge before auth work begins.
+5. The health integration merges into `main` before auth work begins.
