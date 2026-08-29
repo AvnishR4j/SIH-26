@@ -183,6 +183,7 @@ screen -> controller/state -> repository/service -> API client or fixture source
 - All mocks live in reusable fixture files; do not duplicate JSON inside widgets.
 - Mock and real implementations expose the same methods.
 - One config flag selects mock or real mode.
+- Persist an idempotency key with each queued retryable request; reuse it until a definitive response instead of creating a new key on every retry.
 - Unknown response fields are ignored.
 - Access tokens and private values use secure device storage, not source code.
 - User-facing labels are translated in the app; API enum values stay unchanged.
@@ -192,6 +193,7 @@ Avnish keeps FastAPI models and OpenAPI aligned with the same contract:
 - Reuse response schemas instead of returning ad hoc dictionaries.
 - Override FastAPI validation errors with the documented error shape.
 - Add contract tests for status codes, required fields, enum values, and nullability.
+- Test idempotency using the same key with both the same body and a conflicting body.
 - Never return a provider-specific AI payload directly to the frontend.
 
 ## Local Integration Networking

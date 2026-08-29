@@ -85,7 +85,9 @@ The mobile app may retry requests after weak connectivity. It sends a UUID in th
 - Approve draft
 - Submit buyer enquiry
 
-For the same authenticated user, route, and request body, the backend returns the original response when the same key is repeated within 24 hours. Reusing a key with a different body returns `409 IDEMPOTENCY_CONFLICT`.
+The idempotency scope is the authenticated user ID when auth exists. For public routes, it is the route's stable subject: normalized phone number for OTP and public share ID for an enquiry. Within that scope, repeating the same key and request body returns the original response. Reusing a key with a different body returns `409 IDEMPOTENCY_CONFLICT`.
+
+The replay window is 60 seconds for OTP requests and 24 hours for every other operation above. The frontend must persist the key with a queued request and reuse it for network retries; generating a new key for each retry defeats duplicate protection.
 
 ### Pagination
 
@@ -183,7 +185,7 @@ draft -> media_ready -> processing -> needs_confirmation -> ready_for_approval -
 | `media_ready` | Required image and voice note exist |
 | `processing` | An AI operation is running |
 | `needs_confirmation` | Generated or uncertain fields need artisan review |
-| `ready_for_approval` | Required fields and a selected price are complete |
+| `ready_for_approval` | Required fields, selected image, bilingual listing, and price suggestion are complete |
 | `approved` | Immutable approved catalogue was created |
 | `failed` | Last processing operation failed; draft remains editable and retryable |
 
@@ -192,6 +194,8 @@ The frontend must use the status value for behavior and may map it to translated
 ### Operation status
 
 Asynchronous image enhancement and listing generation use `queued`, `running`, `succeeded`, or `failed`. The client polls the operation URL only while the status is `queued` or `running`.
+
+Image `enhancement_status` uses `not_started`, `queued`, `running`, `succeeded`, or `failed`. Voice-note `status` is `uploaded`; transcription progress belongs to the listing-generation operation, not the voice-note resource.
 
 ## Canonical Resource Shapes
 
@@ -279,6 +283,7 @@ Before generation, `listing`, `transcript`, and `pricing` may be `null`; `images
     "material_cost_paise": 30000,
     "labour_cost_paise": 40000,
     "packaging_cost_paise": 5000,
+    "logistics_buffer_paise": 0,
     "minimum_sustainable_price_paise": 75000,
     "market_reference_low_paise": 80000,
     "market_reference_high_paise": 140000
@@ -337,7 +342,7 @@ For the prototype, OTP delivery may be mocked or console-logged in development. 
 
 #### `POST /auth/request-otp`
 
-Auth: public. Headers: `Idempotency-Key`. Success: `202 Accepted`.
+Auth: public. Headers: `Idempotency-Key`. Success: `202 Accepted`. OTP idempotency lasts 60 seconds; rate limiting still applies.
 
 Request:
 
@@ -452,7 +457,7 @@ Response:
 }
 ```
 
-The app presents the plain-language policy before sending acceptance. Sending `accepted: false` records withdrawal for future processing; it does not silently delete existing data. Image enhancement and voice/listing AI return `403 CONSENT_REQUIRED` unless current consent is recorded.
+The app presents the plain-language policy before sending acceptance. `policy_version` must match the current version published by the backend. Sending `accepted: false` records withdrawal for future processing; it does not silently delete existing data. Image enhancement and voice/listing AI return `403 CONSENT_REQUIRED` unless current consent is recorded.
 
 ### 4. Catalogue Drafts
 
@@ -532,7 +537,19 @@ Auth: bearer. Headers: `Idempotency-Key`. Success: `201 Created`.
 }
 ```
 
-`price_override_reason` is required when the approved price is outside the latest suggested range. Approval fails with `400 INVALID_STATE` until required product fields, an approved image, bilingual listing text, and price are present.
+`price_override_reason` is required when the approved price is outside the latest suggested range. Approval fails with `400 INVALID_STATE` until the readiness rules below are satisfied.
+
+MVP approval readiness requires:
+
+- `craft_category`, `product_type`, `material`, `technique`, `dimensions`, `quantity_available`, and `production_time_days`.
+- One primary image with `selected_variant` set to `original` or `enhanced`.
+- Non-empty Hindi and English titles and descriptions.
+- A current pricing suggestion and a positive `approved_price_paise`.
+- No generation or enhancement operation still queued or running for the selected content.
+
+The pricing suggestion is current only when its `draft_version` equals the draft's latest `version`; editing the draft afterward requires a new suggestion. `quantity_available` must be an integer of at least `1`, `production_time_days` must be a non-negative integer, and required text fields must not be blank.
+
+`color`, `care`, `origin`, tags, and `approval_note` are optional. The backend returns missing readiness items in `error.details.fields` so the frontend can take the artisan to the correct step.
 
 Response:
 
@@ -580,7 +597,7 @@ The backend validates the decoded file, not only the filename or browser-provide
 
 #### `POST /catalog/drafts/{draft_id}/images/{image_id}/enhance`
 
-Auth: bearer. Headers: `Idempotency-Key`. Success: `202 Accepted`. Response: `Operation` with type `enhance_image`.
+Auth: bearer. Headers: `Idempotency-Key`. Success: `202 Accepted`. Response: `Operation` with type `enhance_image`. The response also includes `Location: /api/v1/operations/{operation_id}`.
 
 ```json
 {
@@ -631,7 +648,7 @@ Response:
 
 #### `POST /catalog/drafts/{draft_id}/generate-listing`
 
-Auth: bearer. Headers: `Idempotency-Key`. Success: `202 Accepted`. Response: `Operation` with type `generate_listing`.
+Auth: bearer. Headers: `Idempotency-Key`. Success: `202 Accepted`. Response: `Operation` with type `generate_listing`. The response also includes `Location: /api/v1/operations/{operation_id}`.
 
 ```json
 {
@@ -801,3 +818,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | Date | Version | Type | Summary |
 | --- | --- | --- | --- |
 | 2026-08-29 | `0.2.0-draft` | behavioral | Normalized draft schemas; added status codes, lifecycle, pagination, idempotency, upload constraints, operation polling, version protection, privacy boundaries, and change governance. |
+| 2026-08-29 | `0.2.0-draft` | clarification | Defined public-route idempotency scope and OTP window, approval readiness, media status values, operation location header, and complete pricing breakdown. |
