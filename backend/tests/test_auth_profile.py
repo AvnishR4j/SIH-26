@@ -62,6 +62,17 @@ def test_invalid_phone_uses_standard_error_envelope() -> None:
     assert response.json()["error"]["request_id"].startswith("req_")
 
 
+def test_request_otp_requires_uuid_idempotency_key() -> None:
+    response = client.post(
+        "/api/v1/auth/request-otp",
+        headers={"Idempotency-Key": "not-a-uuid"},
+        json={"phone": "+919999999999"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_verify_otp_returns_bearer_token_and_user() -> None:
     otp = request_otp()
     response = client.post(

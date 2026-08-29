@@ -4,12 +4,18 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Query, status
 
 from app.api.dependencies import CatalogServiceDependency, CurrentUser
+from app.core.errors import error_responses
 from app.schemas.catalog import Draft, DraftCreate, DraftList, DraftPatch, DraftStatus
 
 router = APIRouter(tags=["catalogue drafts"])
 
 
-@router.post("/drafts", response_model=Draft, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/drafts",
+    response_model=Draft,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(401, 409, 422, 500),
+)
 def create_draft(
     body: DraftCreate,
     user: CurrentUser,
@@ -19,7 +25,11 @@ def create_draft(
     return service.create_draft(user, body, str(idempotency_key))
 
 
-@router.get("/drafts", response_model=DraftList)
+@router.get(
+    "/drafts",
+    response_model=DraftList,
+    responses=error_responses(401, 422, 500),
+)
 def list_drafts(
     user: CurrentUser,
     service: CatalogServiceDependency,
@@ -30,7 +40,11 @@ def list_drafts(
     return service.list_drafts(user, limit, cursor, status_filter)
 
 
-@router.get("/drafts/{draft_id}", response_model=Draft)
+@router.get(
+    "/drafts/{draft_id}",
+    response_model=Draft,
+    responses=error_responses(401, 404, 500),
+)
 def get_draft(
     draft_id: str,
     user: CurrentUser,
@@ -39,7 +53,11 @@ def get_draft(
     return service.get_draft(user, draft_id)
 
 
-@router.patch("/drafts/{draft_id}", response_model=Draft)
+@router.patch(
+    "/drafts/{draft_id}",
+    response_model=Draft,
+    responses=error_responses(400, 401, 404, 409, 422, 500),
+)
 def update_draft(
     draft_id: str,
     body: DraftPatch,

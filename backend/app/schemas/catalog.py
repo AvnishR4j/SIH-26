@@ -17,15 +17,15 @@ DraftStatus = Literal[
 
 
 class ProductFields(StrictModel):
-    product_type: str | None = None
-    material: str | None = None
-    technique: str | None = None
-    color: str | None = None
-    dimensions: str | None = None
-    quantity_available: int | None = Field(default=None, ge=1)
-    production_time_days: int | None = Field(default=None, ge=0)
-    care: str | None = None
-    origin: str | None = None
+    product_type: str | None
+    material: str | None
+    technique: str | None
+    color: str | None
+    dimensions: str | None
+    quantity_available: int | None = Field(ge=1)
+    production_time_days: int | None = Field(ge=0)
+    care: str | None
+    origin: str | None
 
 
 class ProductFieldsUpdate(StrictModel):
@@ -54,11 +54,11 @@ class ProductFieldsUpdate(StrictModel):
 
 
 class Listing(StrictModel):
-    title_hi: str | None = None
-    title_en: str | None = None
-    description_hi: str | None = None
-    description_en: str | None = None
-    tags: list[str] = Field(default_factory=list)
+    title_hi: str | None
+    title_en: str | None
+    description_hi: str | None
+    description_en: str | None
+    tags: list[str]
 
 
 class ListingUpdate(StrictModel):

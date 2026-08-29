@@ -3,11 +3,14 @@ from binascii import Error as Base64Error
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
+from threading import RLock
 from time import monotonic
 from uuid import uuid4
 
 from pydantic import ValidationError
 
+from app.core.concurrency import synchronized
+from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.schemas.catalog import (
     Draft,
@@ -20,8 +23,6 @@ from app.schemas.catalog import (
     ProductFields,
 )
 from app.services.auth import UserRecord
-
-IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 
 
 @dataclass
@@ -38,14 +39,18 @@ class CreateReplay:
 
 
 class CatalogService:
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self.drafts: dict[str, StoredDraft] = {}
         self.create_replays: dict[tuple[str, str], CreateReplay] = {}
+        self._lock = RLock()
 
+    @synchronized
     def reset(self) -> None:
         self.drafts.clear()
         self.create_replays.clear()
 
+    @synchronized
     def create_draft(self, user: UserRecord, request: DraftCreate, idempotency_key: str) -> Draft:
         scope = (user.id, idempotency_key)
         replay = self.create_replays.get(scope)
@@ -66,7 +71,17 @@ class CatalogService:
             craft_category=request.craft_category,
             source_language=request.source_language,
             initial_notes=request.initial_notes,
-            fields=ProductFields(),
+            fields=ProductFields(
+                product_type=None,
+                material=None,
+                technique=None,
+                color=None,
+                dimensions=None,
+                quantity_available=None,
+                production_time_days=None,
+                care=None,
+                origin=None,
+            ),
             listing=None,
             images=[],
             voice_notes=[],
@@ -82,10 +97,11 @@ class CatalogService:
         self.create_replays[scope] = CreateReplay(
             request=request.model_copy(deep=True),
             draft_id=draft.id,
-            expires_at=monotonic() + IDEMPOTENCY_TTL_SECONDS,
+            expires_at=monotonic() + self.settings.idempotency_ttl_seconds,
         )
         return draft
 
+    @synchronized
     def list_drafts(
         self,
         user: UserRecord,
@@ -113,9 +129,11 @@ class CatalogService:
             next_cursor = self._encode_cursor(last.updated_at, last.id)
         return DraftList(items=[self._summary(draft) for draft in page], next_cursor=next_cursor)
 
+    @synchronized
     def get_draft(self, user: UserRecord, draft_id: str) -> Draft:
         return self._owned_draft(user, draft_id)
 
+    @synchronized
     def update_draft(self, user: UserRecord, draft_id: str, request: DraftPatch) -> Draft:
         draft = self._owned_draft(user, draft_id)
         if draft.status == "approved":
@@ -146,7 +164,13 @@ class CatalogService:
             ]
         if request.listing is not None:
             supplied_listing = request.listing.model_dump(exclude_unset=True)
-            current_listing = draft.listing or Listing()
+            current_listing = draft.listing or Listing(
+                title_hi=None,
+                title_en=None,
+                description_hi=None,
+                description_en=None,
+                tags=[],
+            )
             updates["listing"] = current_listing.model_copy(update=supplied_listing)
 
         updated = draft.model_copy(update=updates)
@@ -206,4 +230,4 @@ class CatalogService:
 
 @lru_cache
 def get_catalog_service() -> CatalogService:
-    return CatalogService()
+    return CatalogService(get_settings())

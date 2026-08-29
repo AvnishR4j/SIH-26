@@ -1,11 +1,68 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
+from starlette.background import BackgroundTask
 from starlette.responses import Response
+
+
+class Utf8JSONResponse(JSONResponse):
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: Mapping[str, str] | None = None,
+        media_type: str | None = None,
+        background: BackgroundTask | None = None,
+    ) -> None:
+        super().__init__(
+            content=content,
+            status_code=status_code,
+            headers=headers,
+            media_type=media_type or "application/json; charset=utf-8",
+            background=background,
+        )
+
+
+class ErrorBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+    details: dict[str, Any]
+    request_id: str
+
+
+class ErrorResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error: ErrorBody
+
+
+ERROR_DESCRIPTIONS = {
+    400: "Invalid state or malformed request",
+    401: "Missing, invalid, or expired authentication",
+    403: "Authenticated user cannot perform this operation",
+    404: "Resource not found",
+    409: "Version, idempotency, or resource conflict",
+    413: "Uploaded content is too large",
+    415: "Unsupported media type",
+    422: "Request validation failed",
+    429: "Rate limit exceeded",
+    500: "Unexpected server error",
+    503: "Required provider is unavailable",
+}
+
+
+def error_responses(*status_codes: int) -> dict[int, dict[str, object]]:
+    return {
+        code: {"model": ErrorResponse, "description": ERROR_DESCRIPTIONS[code]}
+        for code in status_codes
+    }
 
 
 class ApiError(Exception):
@@ -30,7 +87,7 @@ def _request_id(request: Request) -> str:
 
 
 def _response(request: Request, error: ApiError) -> JSONResponse:
-    return JSONResponse(
+    return Utf8JSONResponse(
         status_code=error.status_code,
         headers=error.headers,
         content={
@@ -86,7 +143,10 @@ def install_error_handlers(application: FastAPI) -> None:
             code = "UNAUTHORIZED"
         elif error.status_code == 403:
             code = "FORBIDDEN"
-        return _response(request, ApiError(error.status_code, code, str(error.detail)))
+        return _response(
+            request,
+            ApiError(error.status_code, code, str(error.detail), headers=error.headers),
+        )
 
     @application.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, error: Exception) -> JSONResponse:

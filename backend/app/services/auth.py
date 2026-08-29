@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
+from threading import RLock
 from time import monotonic
 from uuid import uuid4
 
 import jwt
 from jwt import InvalidTokenError
 
+from app.core.concurrency import synchronized
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.schemas.auth import RequestOtpResponse, UserSummary, VerifyOtpResponse
@@ -49,7 +51,9 @@ class AuthService:
         self.otp_attempts: dict[str, list[float]] = {}
         self.users_by_id: dict[str, UserRecord] = {}
         self.user_ids_by_phone: dict[str, str] = {}
+        self._lock = RLock()
 
+    @synchronized
     def reset(self) -> None:
         self.otp_requests.clear()
         self.otp_idempotency.clear()
@@ -57,6 +61,7 @@ class AuthService:
         self.users_by_id.clear()
         self.user_ids_by_phone.clear()
 
+    @synchronized
     def request_otp(self, phone: str, idempotency_key: str) -> RequestOtpResponse:
         now = monotonic()
         scope = (phone, idempotency_key)
@@ -97,6 +102,7 @@ class AuthService:
         )
         return response
 
+    @synchronized
     def verify_otp(self, request_id: str, otp: str) -> VerifyOtpResponse:
         record = self.otp_requests.get(request_id)
         if record is None or record.expires_at <= monotonic() or record.otp != otp:
@@ -121,6 +127,7 @@ class AuthService:
             user=self.user_summary(user),
         )
 
+    @synchronized
     def authenticate(self, token: str) -> UserRecord:
         try:
             payload = jwt.decode(
@@ -138,6 +145,7 @@ class AuthService:
             raise ApiError(401, "UNAUTHORIZED", "The access token is invalid or expired.")
         return user
 
+    @synchronized
     def profile(self, user: UserRecord) -> ProfileResponse:
         return ProfileResponse(
             **self.user_summary(user).model_dump(),
@@ -150,6 +158,7 @@ class AuthService:
             ),
         )
 
+    @synchronized
     def update_profile(self, user: UserRecord, update: ProfileUpdate) -> ProfileResponse:
         values = update.model_dump(exclude_unset=True)
         for required_field in ("name", "preferred_language", "craft_categories"):
@@ -164,6 +173,7 @@ class AuthService:
             setattr(user, key, value)
         return self.profile(user)
 
+    @synchronized
     def update_consent(
         self, user: UserRecord, accepted: bool, policy_version: str
     ) -> ConsentStatus:
