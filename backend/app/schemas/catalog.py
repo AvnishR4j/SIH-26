@@ -92,6 +92,28 @@ class DraftImage(StrictModel):
     created_at: datetime
 
 
+class ImageEnhancementRequest(StrictModel):
+    background: Literal["neutral", "keep_original"] = "neutral"
+    crop_style: Literal["marketplace_square", "keep_original"] = "marketplace_square"
+    preserve_original: Literal[True] = True
+
+
+class DraftImagePatch(StrictModel):
+    version: int = Field(ge=1)
+    is_primary: bool | None = None
+    selected_variant: Literal["original", "enhanced"] | None = None
+
+    @model_validator(mode="after")
+    def require_image_change(self) -> "DraftImagePatch":
+        changed_fields = self.model_fields_set - {"version"}
+        if not changed_fields:
+            raise ValueError("At least one image field must be supplied.")
+        for field_name in changed_fields:
+            if getattr(self, field_name) is None:
+                raise ValueError(f"{field_name} cannot be null.")
+        return self
+
+
 class VoiceNote(StrictModel):
     id: str
     language: Literal["hi", "en"]

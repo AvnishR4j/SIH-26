@@ -1,9 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
 from pathlib import Path
 from threading import Barrier
 from uuid import uuid4
 
+from PIL import Image
 from sqlalchemy import func, select
 
 from app.core.config import Settings
@@ -15,19 +17,28 @@ from app.db.models import (
     OtpRequest,
 )
 from app.db.session import Database, normalize_database_url
-from app.schemas.catalog import DraftCreate, DraftPatch, ProductFieldsUpdate
+from app.schemas.catalog import (
+    DraftCreate,
+    DraftPatch,
+    ImageEnhancementRequest,
+    ProductFieldsUpdate,
+)
 from app.schemas.profile import ProfileUpdate
 from app.services.auth import AuthService
 from app.services.catalog import CatalogService
+from app.services.media import MediaService
+from app.storage.local import LocalMediaStorage
 
 
-def database_settings(path: Path) -> Settings:
+def database_settings(path: Path, media_path: Path | None = None) -> Settings:
     return Settings(
         _env_file=None,
         environment="test",
         jwt_secret="persistence-test-secret-at-least-32-characters",
         database_url=f"sqlite+pysqlite:///{path}",
         database_auto_create=True,
+        media_local_dir=media_path or path.parent / "media",
+        media_url_base="http://testserver/media",
     )
 
 
@@ -35,6 +46,12 @@ def authenticated_user(auth: AuthService, phone: str = "+919999999999"):
     otp = auth.request_otp(phone, str(uuid4()))
     login = auth.verify_otp(otp.request_id, "123456")
     return login, auth.authenticate(login.access_token)
+
+
+def jpeg_bytes() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (80, 60), (120, 40, 20)).save(output, format="JPEG")
+    return output.getvalue()
 
 
 def test_postgres_urls_use_the_installed_psycopg_driver() -> None:
@@ -195,3 +212,59 @@ def test_idempotency_keys_can_be_reused_after_their_replay_window(tmp_path: Path
     )
     assert second_draft.id != first_draft.id
     database.dispose()
+
+
+def test_media_and_operations_survive_database_reinitialization(tmp_path: Path) -> None:
+    media_path = tmp_path / "media"
+    settings = database_settings(tmp_path / "media-restart.db", media_path)
+    first_database = Database(settings)
+    first_auth = AuthService(settings, first_database)
+    first_catalog = CatalogService(settings, first_database)
+    first_media = MediaService(
+        settings,
+        first_database,
+        LocalMediaStorage(settings),
+    )
+    login, user = authenticated_user(first_auth)
+    first_auth.update_consent(user, True, settings.media_consent_policy_version)
+    user = first_auth.authenticate(login.access_token)
+    draft = first_catalog.create_draft(
+        user,
+        DraftCreate(craft_category="textile", source_language="hi"),
+        str(uuid4()),
+    )
+    image = first_media.upload_image(
+        user,
+        draft.id,
+        jpeg_bytes(),
+        True,
+        str(uuid4()),
+    )
+    operation, _ = first_media.start_image_enhancement(
+        user,
+        draft.id,
+        image.id,
+        ImageEnhancementRequest(),
+        str(uuid4()),
+    )
+    first_media.complete_image_enhancement(user.id, operation.id)
+    first_database.dispose()
+
+    second_database = Database(settings)
+    second_auth = AuthService(settings, second_database)
+    second_catalog = CatalogService(settings, second_database)
+    second_media = MediaService(
+        settings,
+        second_database,
+        LocalMediaStorage(settings),
+    )
+    restored_user = second_auth.authenticate(login.access_token)
+    restored_draft = second_catalog.get_draft(restored_user, draft.id)
+    restored_operation = second_media.get_operation(restored_user, operation.id)
+
+    assert restored_operation.status == "succeeded"
+    assert restored_draft.images[0].enhancement_status == "succeeded"
+    assert restored_draft.images[0].enhanced_url is not None
+    assert len(list(media_path.rglob("original.jpg"))) == 1
+    assert len(list(media_path.rglob("enhanced.jpg"))) == 1
+    second_database.dispose()

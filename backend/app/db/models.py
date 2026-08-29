@@ -18,6 +18,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, utc_now
 
 JSON_DOCUMENT = JSON().with_variant(JSONB, "postgresql")
+NULLABLE_JSON_DOCUMENT = JSON(none_as_null=True).with_variant(
+    JSONB(none_as_null=True), "postgresql"
+)
 
 
 class User(Base):
@@ -122,8 +125,123 @@ class DraftCreateIdempotency(Base):
     )
     idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
     request_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    response_payload: Mapped[dict[str, Any] | None] = mapped_column(NULLABLE_JSON_DOCUMENT)
     draft_id: Mapped[str] = mapped_column(
         ForeignKey("catalog_drafts.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class MediaObject(Base):
+    __tablename__ = "media_objects"
+    __table_args__ = (
+        CheckConstraint("original_size_bytes > 0", name="original_size_positive"),
+        CheckConstraint(
+            "(enhanced_key IS NULL AND enhanced_content_type IS NULL "
+            "AND enhanced_size_bytes IS NULL AND enhanced_sha256 IS NULL) OR "
+            "(enhanced_key IS NOT NULL AND enhanced_content_type IS NOT NULL "
+            "AND enhanced_size_bytes > 0 AND enhanced_sha256 IS NOT NULL)",
+            name="enhanced_metadata_consistent",
+        ),
+        Index("ix_media_objects_draft_created", "draft_id", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    draft_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_drafts.id", ondelete="CASCADE"), nullable=False
+    )
+    original_key: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    original_content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    original_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    enhanced_key: Mapped[str | None] = mapped_column(String(500), unique=True)
+    enhanced_content_type: Mapped[str | None] = mapped_column(String(40))
+    enhanced_size_bytes: Mapped[int | None] = mapped_column(Integer)
+    enhanced_sha256: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class ImageUploadIdempotency(Base):
+    __tablename__ = "image_upload_idempotency"
+    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    image_id: Mapped[str] = mapped_column(
+        ForeignKey("media_objects.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class Operation(Base):
+    __tablename__ = "operations"
+    __table_args__ = (
+        CheckConstraint("type IN ('enhance_image', 'generate_listing')", name="type_allowed"),
+        CheckConstraint(
+            "status IN ('queued', 'running', 'succeeded', 'failed')",
+            name="status_allowed",
+        ),
+        CheckConstraint("resource_type = 'draft'", name="resource_type_allowed"),
+        CheckConstraint(
+            "(status = 'failed' AND error IS NOT NULL) OR (status != 'failed' AND error IS NULL)",
+            name="error_consistent",
+        ),
+        Index("ix_operations_owner_updated", "owner_id", "updated_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    resource_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_drafts.id", ondelete="CASCADE"), nullable=False
+    )
+    internal_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    error: Mapped[dict[str, Any] | None] = mapped_column(NULLABLE_JSON_DOCUMENT)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class OperationIdempotency(Base):
+    __tablename__ = "operation_idempotency"
+    __table_args__ = (UniqueConstraint("owner_id", "operation_type", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    operation_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    operation_id: Mapped[str] = mapped_column(
+        ForeignKey("operations.id", ondelete="CASCADE"), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

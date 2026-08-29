@@ -17,6 +17,10 @@ from app.db.base import ensure_utc
 from app.db.models import (
     CatalogDraft,
     DraftCreateIdempotency,
+    ImageUploadIdempotency,
+    MediaObject,
+    Operation,
+    OperationIdempotency,
     OtpAttempt,
     OtpIdempotency,
     OtpRequest,
@@ -50,6 +54,10 @@ class AuthService:
     def reset(self) -> None:
         """Clear persisted test data in foreign-key-safe order."""
         with self._lock, self.database.session() as session, session.begin():
+            session.execute(delete(OperationIdempotency))
+            session.execute(delete(Operation))
+            session.execute(delete(ImageUploadIdempotency))
+            session.execute(delete(MediaObject))
             session.execute(delete(DraftCreateIdempotency))
             session.execute(delete(CatalogDraft))
             session.execute(delete(OtpIdempotency))

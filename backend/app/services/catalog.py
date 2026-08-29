@@ -12,7 +12,14 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.db.base import ensure_utc
-from app.db.models import CatalogDraft, DraftCreateIdempotency
+from app.db.models import (
+    CatalogDraft,
+    DraftCreateIdempotency,
+    ImageUploadIdempotency,
+    MediaObject,
+    Operation,
+    OperationIdempotency,
+)
 from app.db.session import Database, get_database
 from app.schemas.catalog import (
     Draft,
@@ -35,6 +42,10 @@ class CatalogService:
 
     def reset(self) -> None:
         with self._lock, self.database.session() as session, session.begin():
+            session.execute(delete(OperationIdempotency))
+            session.execute(delete(Operation))
+            session.execute(delete(ImageUploadIdempotency))
+            session.execute(delete(MediaObject))
             session.execute(delete(DraftCreateIdempotency))
             session.execute(delete(CatalogDraft))
 
@@ -53,6 +64,8 @@ class CatalogService:
                     if replay is not None and ensure_utc(replay.expires_at) > now:
                         if replay.request_payload != request_payload:
                             raise self._idempotency_conflict()
+                        if replay.response_payload is not None:
+                            return Draft.model_validate(replay.response_payload)
                         row = session.get(CatalogDraft, replay.draft_id)
                         if row is None:
                             raise ApiError(
@@ -80,6 +93,7 @@ class CatalogService:
                             owner_id=user.id,
                             idempotency_key=idempotency_key,
                             request_payload=request_payload,
+                            response_payload=draft.model_dump(mode="json"),
                             draft_id=draft.id,
                             expires_at=now
                             + timedelta(seconds=self.settings.idempotency_ttl_seconds),
@@ -226,6 +240,8 @@ class CatalogService:
             if replay is not None and ensure_utc(replay.expires_at) > now:
                 if replay.request_payload != request_payload:
                     raise self._idempotency_conflict()
+                if replay.response_payload is not None:
+                    return Draft.model_validate(replay.response_payload)
                 row = session.get(CatalogDraft, replay.draft_id)
                 if row is not None:
                     return self._draft(row)
