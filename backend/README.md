@@ -18,6 +18,21 @@ Open:
 - API health: `http://localhost:8000/api/v1/health`
 - Swagger: `http://localhost:8000/docs`
 
+## Development authentication
+
+The current prototype implements the frozen OTP and profile contract with
+in-memory storage. Request an OTP with an `Idempotency-Key` header, then verify
+it with the development code `123456`. Restarting the server clears users,
+OTP requests, and profile updates.
+
+Implemented routes:
+
+- `POST /api/v1/auth/request-otp`
+- `POST /api/v1/auth/verify-otp`
+- `GET /api/v1/me`
+- `PATCH /api/v1/me`
+- `PUT /api/v1/me/consents/media-processing`
+
 Run tests:
 
 ```bash
