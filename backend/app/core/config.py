@@ -37,8 +37,9 @@ class Settings(BaseSettings):
     idempotency_ttl_seconds: int = 86400
     dev_otp: str | None = "123456"
     media_consent_policy_version: str = "2026-08-29"
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/kalasetu"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/kalasetu"
     database_echo: bool = False
+    database_auto_create: bool = False
 
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
@@ -50,6 +51,10 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET must be replaced in production")
         if self.environment == "production" and len(self.jwt_secret) < 32:
             raise ValueError("JWT_SECRET must contain at least 32 characters in production")
+        if self.environment == "production" and self.database_auto_create:
+            raise ValueError(
+                "DATABASE_AUTO_CREATE must be false in production; run migrations instead"
+            )
         return self
 
 

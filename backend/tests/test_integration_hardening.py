@@ -7,12 +7,14 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from sqlalchemy import func, select
 
 from app.core.config import Settings
 from app.core.errors import ApiError
+from app.db.models import CatalogDraft, OtpRequest
 from app.main import app
 from app.schemas.catalog import DraftCreate, DraftPatch, ProductFieldsUpdate
-from app.services.auth import AuthService, UserRecord
+from app.services.auth import AuthService
 from app.services.catalog import CatalogService
 
 client = TestClient(app)
@@ -102,7 +104,8 @@ def test_otp_rate_limit_and_retry_are_atomic() -> None:
         request_ids = list(executor.map(lambda _: request_same_otp(), range(8)))
 
     assert len(set(request_ids)) == 1
-    assert len(service.otp_requests) == 1
+    with service.database.session() as session:
+        assert session.scalar(select(func.count(OtpRequest.id))) == 1
     service.request_otp("+919999999999", str(uuid4()))
     with pytest.raises(ApiError) as error:
         service.request_otp("+919999999999", str(uuid4()))
@@ -111,7 +114,10 @@ def test_otp_rate_limit_and_retry_are_atomic() -> None:
 
 def test_catalogue_retry_and_version_update_are_atomic() -> None:
     service = CatalogService(settings(environment="test"))
-    user = UserRecord(id="usr_test", phone="+919999999999")
+    auth_service = AuthService(settings(environment="test"))
+    otp = auth_service.request_otp("+919999999999", str(uuid4()))
+    login = auth_service.verify_otp(otp.request_id, "123456")
+    user = auth_service.authenticate(login.access_token)
     create = DraftCreate(craft_category="textile", source_language="hi")
     replay_key = str(uuid4())
     create_barrier = Barrier(8)
@@ -124,7 +130,8 @@ def test_catalogue_retry_and_version_update_are_atomic() -> None:
         draft_ids = list(executor.map(lambda _: create_same_draft(), range(8)))
 
     assert len(set(draft_ids)) == 1
-    assert len(service.drafts) == 1
+    with service.database.session() as session:
+        assert session.scalar(select(func.count(CatalogDraft.id))) == 1
 
     draft_id = draft_ids[0]
     patch = DraftPatch(version=1, fields=ProductFieldsUpdate(material="cotton"))

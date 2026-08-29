@@ -10,8 +10,14 @@ From the repository root:
 ```bash
 python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt
+cp .env.example .env
+backend/.venv/bin/alembic -c backend/alembic.ini upgrade head
 backend/.venv/bin/uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 --reload
 ```
+
+Set `DATABASE_URL` in `.env` to a reachable PostgreSQL database before running
+the migration. Both `postgresql://` and `postgresql+psycopg://` URLs are
+accepted; the backend normalizes them to the installed psycopg 3 driver.
 
 Open:
 
@@ -20,14 +26,11 @@ Open:
 
 ## Development authentication
 
-The current prototype implements the frozen OTP, profile, and catalogue draft
-contract with in-memory storage. Request an OTP with an `Idempotency-Key`
-header, then verify it with the development code `123456`. Restarting the
-server clears users, OTP requests, profiles, and catalogue drafts.
-
-The in-memory store is intentionally limited to local single-process integration.
-It now serializes retry and version-sensitive operations, but shared deployment
-still requires the planned PostgreSQL/Supabase persistence milestone.
+The backend implements the frozen OTP, profile, and catalogue draft contract
+with transactional PostgreSQL persistence. Request an OTP with an
+`Idempotency-Key` header, then verify it with the development code `123456`.
+Users, profiles, consent, retry records, and drafts survive server restarts.
+OTPs are stored as keyed hashes and are consumed atomically.
 
 Implemented routes:
 
@@ -44,8 +47,27 @@ Implemented routes:
 Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
 latest `version`; stale writes return `409 VERSION_CONFLICT` so the frontend can
 refetch before retrying. The catalogue service owns persistence behind the HTTP
-routes, allowing Supabase storage to replace the prototype store without an API
-contract change.
+routes, so later media, AI, and approval work does not change the Flutter-facing
+draft contract.
+
+## Database migrations
+
+Run migrations before starting any shared or production-like deployment:
+
+```bash
+cd backend
+.venv/bin/alembic -c alembic.ini upgrade head
+.venv/bin/alembic -c alembic.ini current
+.venv/bin/alembic -c alembic.ini check
+```
+
+`DATABASE_AUTO_CREATE=true` is available only for isolated development and
+tests. Production rejects it so schema changes cannot bypass migration history.
+
+For Supabase, use the server-side direct or Session pooler PostgreSQL URL with
+TLS enabled. Never place the database password or a service-role key in Flutter.
+The migration enables Row Level Security on every application table without
+adding client policies; data access is intentionally restricted to this backend.
 
 Frontend development URLs:
 

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.db.session import get_database
 from app.main import app
 
 client = TestClient(app)
@@ -35,3 +36,19 @@ def test_flutter_web_origin_is_allowed() -> None:
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_health_reports_degraded_when_database_is_unavailable() -> None:
+    class UnavailableDatabase:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+    app.dependency_overrides[get_database] = UnavailableDatabase
+    try:
+        response = client.get("/api/v1/health")
+    finally:
+        app.dependency_overrides.pop(get_database, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
