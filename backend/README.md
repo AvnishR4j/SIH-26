@@ -20,10 +20,10 @@ Open:
 
 ## Development authentication
 
-The current prototype implements the frozen OTP and profile contract with
-in-memory storage. Request an OTP with an `Idempotency-Key` header, then verify
-it with the development code `123456`. Restarting the server clears users,
-OTP requests, and profile updates.
+The current prototype implements the frozen OTP, profile, and catalogue draft
+contract with in-memory storage. Request an OTP with an `Idempotency-Key`
+header, then verify it with the development code `123456`. Restarting the
+server clears users, OTP requests, profiles, and catalogue drafts.
 
 Implemented routes:
 
@@ -32,6 +32,16 @@ Implemented routes:
 - `GET /api/v1/me`
 - `PATCH /api/v1/me`
 - `PUT /api/v1/me/consents/media-processing`
+- `POST /api/v1/catalog/drafts`
+- `GET /api/v1/catalog/drafts`
+- `GET /api/v1/catalog/drafts/{draft_id}`
+- `PATCH /api/v1/catalog/drafts/{draft_id}`
+
+Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
+latest `version`; stale writes return `409 VERSION_CONFLICT` so the frontend can
+refetch before retrying. The catalogue service owns persistence behind the HTTP
+routes, allowing Supabase storage to replace the prototype store without an API
+contract change.
 
 Run tests:
 

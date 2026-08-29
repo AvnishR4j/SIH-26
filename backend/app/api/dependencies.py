@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.errors import ApiError
 from app.services.auth import AuthService, UserRecord, get_auth_service
+from app.services.catalog import CatalogService, get_catalog_service
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -20,3 +21,4 @@ def get_current_user(
 
 CurrentUser = Annotated[UserRecord, Depends(get_current_user)]
 AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
+CatalogServiceDependency = Annotated[CatalogService, Depends(get_catalog_service)]
