@@ -164,9 +164,7 @@ class CatalogService:
                 next_cursor = self._encode_cursor(ensure_utc(last.updated_at), last.id)
             return DraftList(
                 items=[
-                    self._summary(
-                        refresh_draft_image_urls(session, self._draft(row), self.storage)
-                    )
+                    self._summary(refresh_draft_image_urls(session, self._draft(row), self.storage))
                     for row in page
                 ],
                 next_cursor=next_cursor,

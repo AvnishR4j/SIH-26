@@ -70,18 +70,14 @@ def test_supabase_storage_routes_private_and_public_objects() -> None:
     storage.delete("drafts/u1/photo.jpg")
 
     assert requests[2].method == "POST"
-    assert requests[2].url.path.endswith(
-        "/object/kalasetu-private/drafts/u1/photo.jpg"
-    )
+    assert requests[2].url.path.endswith("/object/kalasetu-private/drafts/u1/photo.jpg")
     assert requests[2].headers["authorization"] == "Bearer sb_secret_test"
     assert requests[2].headers["apikey"] == "sb_secret_test"
     assert requests[2].headers["x-upsert"] == "true"
     assert requests[3].url.path.endswith(
         "/object/authenticated/kalasetu-private/drafts/u1/photo.jpg"
     )
-    assert requests[5].url.path.endswith(
-        "/object/kalasetu-public/public/share_1/product.jpg"
-    )
+    assert requests[5].url.path.endswith("/object/kalasetu-public/public/share_1/product.jpg")
 
 
 def test_supabase_storage_normalizes_errors_without_leaking_provider_details() -> None:

@@ -69,6 +69,7 @@ class LocalMediaStorage:
             raise ApiError(500, "INTERNAL_ERROR", "The media key is invalid.")
         return path
 
+
 @lru_cache
 def get_media_storage() -> LocalMediaStorage:
     return LocalMediaStorage(get_settings())

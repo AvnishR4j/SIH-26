@@ -18,10 +18,6 @@ class MediaStorage(Protocol):
 
 def normalized_media_key(key: str) -> str:
     path = PurePosixPath(key)
-    if (
-        path.is_absolute()
-        or not path.parts
-        or any(part in {"", ".", ".."} for part in path.parts)
-    ):
+    if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
         raise ApiError(500, "INTERNAL_ERROR", "The media key is invalid.")
     return path.as_posix()
