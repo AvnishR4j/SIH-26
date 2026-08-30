@@ -17,6 +17,7 @@ from app.db.session import get_database
 from app.main import app
 from app.services.auth import get_auth_service
 from app.services.catalog import get_catalog_service
+from app.services.sharing import get_sharing_service
 
 client = TestClient(app)
 
@@ -433,6 +434,31 @@ def test_enquiry_rate_limit_applies_after_replay_check() -> None:
     assert blocked.status_code == 429
     assert blocked.headers["retry-after"] == "3600"
     assert blocked.json()["error"]["code"] == "RATE_LIMITED"
+
+
+def test_enquiry_retry_rechecks_replay_after_snapshot_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = login_headers()
+    draft = prepare_ready_draft(headers)
+    share_id = approve(headers, draft["id"]).json()["public_share_id"]
+    key = str(uuid4())
+    first = submit_enquiry(share_id, enquiry_payload(), key=key)
+    service = get_sharing_service()
+    real_replay = service._enquiry_replay
+    calls = 0
+
+    def delayed_replay(*args: object):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else real_replay(*args)
+
+    monkeypatch.setattr(service, "_enquiry_replay", delayed_replay)
+    retry = submit_enquiry(share_id, enquiry_payload(), key=key)
+
+    assert retry.status_code == 201
+    assert retry.json() == first.json()
+    assert calls == 2
 
 
 def test_unknown_public_share_is_not_found() -> None:

@@ -127,7 +127,8 @@ and are rate-limited per buyer phone and catalogue.
 
 `MEDIA_STORAGE=local` supports this flow for development. Production must use a
 private draft-media store plus a deliberate public publishing adapter for the
-artisan-selected share image.
+artisan-selected share image. The application fails closed if local media is
+configured under `ENVIRONMENT=production`.
 
 ## Database migrations
 

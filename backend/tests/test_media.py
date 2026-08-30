@@ -300,6 +300,34 @@ def test_enhancement_requires_consent_and_produces_pollable_operation() -> None:
     assert stale_selection.json()["error"]["code"] == "VERSION_CONFLICT"
 
 
+def test_enhancement_retry_rechecks_replay_after_draft_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = login_headers()
+    draft = create_draft(headers)
+    draft_id = str(draft["id"])
+    image = upload_image(headers, draft_id, image_bytes()).json()
+    accept_consent(headers)
+    user = get_auth_service().authenticate(headers["Authorization"].removeprefix("Bearer "))
+    service = get_media_service()
+    key = str(uuid4())
+    request = ImageEnhancementRequest()
+    first, _ = service.start_image_enhancement(user, draft_id, image["id"], request, key)
+    real_replay = service._operation_replay
+    calls = 0
+
+    def delayed_replay(*args: object):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else real_replay(*args)
+
+    monkeypatch.setattr(service, "_operation_replay", delayed_replay)
+    retry, _ = service.start_image_enhancement(user, draft_id, image["id"], request, key)
+
+    assert retry == first
+    assert calls == 2
+
+
 def test_media_resources_do_not_leak_across_users() -> None:
     owner_headers = login_headers("+919999999999")
     draft = create_draft(owner_headers)

@@ -58,6 +58,14 @@ class PricingService:
 
                     row = self._owned_draft_row(session, user.id, draft_id)
                     draft = Draft.model_validate(row.payload)
+                    concurrent_replay = self._replay(session, user.id, idempotency_key)
+                    if (
+                        concurrent_replay is not None
+                        and ensure_utc(concurrent_replay.expires_at) > now
+                    ):
+                        if concurrent_replay.request_payload != request_payload:
+                            raise self._idempotency_conflict()
+                        return PricingSuggestion.model_validate(concurrent_replay.response_payload)
                     if draft.status == "approved":
                         raise ApiError(
                             400,

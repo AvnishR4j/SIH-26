@@ -310,6 +310,41 @@ def test_generation_requires_consent_and_stores_grounded_transcript(
     assert changed.status_code == 409
 
 
+def test_generation_retry_rechecks_replay_after_draft_lock(
+    monkeypatch: pytest.MonkeyPatch,
+    voice_service_override: FakeTranscriber,
+) -> None:
+    del voice_service_override
+    headers = login_headers()
+    draft = create_draft(headers)
+    draft_id = str(draft["id"])
+    image = upload_image(headers, draft_id)
+    voice = upload_voice(headers, draft_id).json()
+    accept_consent(headers)
+    user = get_auth_service().authenticate(headers["Authorization"].removeprefix("Bearer "))
+    service = app.dependency_overrides[get_voice_service]()
+    key = str(uuid4())
+    request = GenerateListingRequest(
+        voice_note_id=voice["id"],
+        image_id=image["id"],
+        target_languages=["hi", "en"],
+    )
+    first, _ = service.start_listing_generation(user, draft_id, request, key)
+    real_replay = service._operation_replay
+    calls = 0
+
+    def delayed_replay(*args: object):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else real_replay(*args)
+
+    monkeypatch.setattr(service, "_operation_replay", delayed_replay)
+    retry, _ = service.start_listing_generation(user, draft_id, request, key)
+
+    assert retry == first
+    assert calls == 2
+
+
 def test_generation_failure_is_persisted_for_polling(
     voice_service_override: FakeTranscriber,
 ) -> None:

@@ -13,6 +13,7 @@ from app.db.session import get_database
 from app.main import app
 from app.services.auth import get_auth_service
 from app.services.catalog import get_catalog_service
+from app.services.pricing import get_pricing_service
 
 client = TestClient(app)
 
@@ -125,6 +126,30 @@ def test_pricing_replay_is_original_snapshot_and_does_not_increment_twice() -> N
     assert first.status_code == replay.status_code == 200
     assert replay.json() == first.json()
     assert stored.json()["version"] == 2
+
+
+def test_pricing_retry_rechecks_replay_after_draft_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = login_headers()
+    draft = create_draft(headers)
+    key = str(uuid4())
+    first = suggest(headers, draft["id"], pricing_payload(), key=key)
+    service = get_pricing_service()
+    real_replay = service._replay
+    calls = 0
+
+    def delayed_replay(*args: object):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else real_replay(*args)
+
+    monkeypatch.setattr(service, "_replay", delayed_replay)
+    retry = suggest(headers, draft["id"], pricing_payload(), key=key)
+
+    assert retry.status_code == 200
+    assert retry.json() == first.json()
+    assert calls == 2
 
 
 def test_concurrent_pricing_retries_create_only_one_draft_version() -> None:

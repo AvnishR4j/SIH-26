@@ -214,6 +214,17 @@ class SharingService:
                     )
                     if snapshot is None:
                         raise ApiError(404, "NOT_FOUND", "The shared catalogue was not found.")
+                    concurrent_replay = self._enquiry_replay(
+                        session, public_share_id, idempotency_key
+                    )
+                    if (
+                        concurrent_replay is not None
+                        and ensure_utc(concurrent_replay.expires_at) > now
+                    ):
+                        self._assert_same_request(
+                            concurrent_replay.request_payload, request_payload
+                        )
+                        return EnquiryResponse.model_validate(concurrent_replay.response_payload)
                     window_start = now - timedelta(hours=1)
                     recent_count = session.scalar(
                         select(func.count(BuyerEnquiry.id)).where(

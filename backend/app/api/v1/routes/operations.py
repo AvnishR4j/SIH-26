@@ -10,7 +10,7 @@ router = APIRouter(tags=["operations"])
 @router.get(
     "/{operation_id}",
     response_model=OperationResponse,
-    responses=error_responses(401, 404, 500),
+    responses=error_responses(401, 404, 422, 500),
 )
 def get_operation(
     operation_id: str,

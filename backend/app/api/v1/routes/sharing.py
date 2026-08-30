@@ -13,7 +13,7 @@ router = APIRouter(tags=["sharing"])
 @router.get(
     "/{public_share_id}",
     response_model=PublicShareCard,
-    responses=error_responses(404, 500),
+    responses=error_responses(404, 422, 500),
 )
 def get_share_card(
     public_share_id: str,

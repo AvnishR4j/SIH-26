@@ -75,7 +75,7 @@ def list_drafts(
 @router.get(
     "/drafts/{draft_id}",
     response_model=Draft,
-    responses=error_responses(401, 404, 500),
+    responses=error_responses(401, 404, 422, 500),
 )
 def get_draft(
     draft_id: str,

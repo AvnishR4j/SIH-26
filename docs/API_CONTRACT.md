@@ -832,3 +832,6 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | 2026-08-30 | `0.2.0-frozen` | status | Marked implemented health, authentication, profile, and catalogue draft routes as mocked pending Flutter verification. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | status | Marked image upload, deterministic mock enhancement, image selection, and operation polling as mocked pending Flutter verification. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | status | Marked voice upload, local faster-whisper transcription, grounded listing scaffold, and generation polling as mocked pending Flutter verification. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | status | Marked deterministic explainable pricing, benchmark provenance, and pricing retry protection as mocked pending Flutter verification. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | status | Marked approval, immutable catalogue snapshots, public sharing, and consented buyer enquiries as mocked pending Flutter verification. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | security | Hardened concurrent idempotent retries, production URL and storage validation, and dependency security. No HTTP interface changed. |

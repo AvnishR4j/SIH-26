@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8080"]
     )
     jwt_secret: str = "development-only-secret-change-before-production"
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_expires_seconds: int = 86400
     otp_expires_seconds: int = 300
     otp_retry_after_seconds: int = 30
@@ -73,12 +73,12 @@ class Settings(BaseSettings):
             raise ValueError("MEDIA_URL_BASE must be an absolute HTTP(S) URL")
         return normalized
 
-    @field_validator("public_share_web_base_url")
+    @field_validator("public_api_base_url", "public_share_web_base_url")
     @classmethod
-    def validate_public_share_web_base_url(cls, value: str) -> str:
+    def validate_public_url(cls, value: str) -> str:
         normalized = value.rstrip("/")
         if not normalized.startswith(("http://", "https://")):
-            raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must be an absolute HTTP(S) URL")
+            raise ValueError("Public URLs must be absolute HTTP(S) URLs")
         return normalized
 
     @model_validator(mode="after")
@@ -101,6 +101,16 @@ class Settings(BaseSettings):
             "https://"
         ):
             raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must use HTTPS in production")
+        if self.environment == "production" and not self.public_api_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_API_BASE_URL must use HTTPS in production")
+        if self.environment == "production" and any(
+            not origin.startswith("https://") for origin in self.cors_origins
+        ):
+            raise ValueError("CORS_ORIGINS must use HTTPS in production")
+        if self.environment == "production" and self.media_storage == "local":
+            raise ValueError(
+                "MEDIA_STORAGE=local is development-only; configure private object storage"
+            )
         return self
 
 
