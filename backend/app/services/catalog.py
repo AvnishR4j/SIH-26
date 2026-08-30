@@ -19,6 +19,8 @@ from app.db.models import (
     MediaObject,
     Operation,
     OperationIdempotency,
+    VoiceMedia,
+    VoiceUploadIdempotency,
 )
 from app.db.session import Database, get_database
 from app.schemas.catalog import (
@@ -44,6 +46,8 @@ class CatalogService:
         with self._lock, self.database.session() as session, session.begin():
             session.execute(delete(OperationIdempotency))
             session.execute(delete(Operation))
+            session.execute(delete(VoiceUploadIdempotency))
+            session.execute(delete(VoiceMedia))
             session.execute(delete(ImageUploadIdempotency))
             session.execute(delete(MediaObject))
             session.execute(delete(DraftCreateIdempotency))

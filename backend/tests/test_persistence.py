@@ -1,3 +1,4 @@
+import wave
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
@@ -20,6 +21,7 @@ from app.db.session import Database, normalize_database_url
 from app.schemas.catalog import (
     DraftCreate,
     DraftPatch,
+    GenerateListingRequest,
     ImageEnhancementRequest,
     ProductFieldsUpdate,
 )
@@ -27,6 +29,8 @@ from app.schemas.profile import ProfileUpdate
 from app.services.auth import AuthService
 from app.services.catalog import CatalogService
 from app.services.media import MediaService
+from app.services.speech import TranscriptionResult
+from app.services.voice import VoiceService
 from app.storage.local import LocalMediaStorage
 
 
@@ -52,6 +56,23 @@ def jpeg_bytes() -> bytes:
     output = BytesIO()
     Image.new("RGB", (80, 60), (120, 40, 20)).save(output, format="JPEG")
     return output.getvalue()
+
+
+def wav_bytes() -> bytes:
+    output = BytesIO()
+    with wave.open(output, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(8_000)
+        audio.writeframes(b"\0\0" * 8_000)
+    return output.getvalue()
+
+
+class RestartTranscriber:
+    def transcribe(self, content: bytes, language: str) -> TranscriptionResult:
+        assert content.startswith(b"RIFF")
+        assert language == "hi"
+        return TranscriptionResult(text="हाथ से बना कपड़े का उत्पाद", language="hi")
 
 
 def test_postgres_urls_use_the_installed_psycopg_driver() -> None:
@@ -225,6 +246,12 @@ def test_media_and_operations_survive_database_reinitialization(tmp_path: Path) 
         first_database,
         LocalMediaStorage(settings),
     )
+    first_voice = VoiceService(
+        settings,
+        first_database,
+        LocalMediaStorage(settings),
+        RestartTranscriber(),
+    )
     login, user = authenticated_user(first_auth)
     first_auth.update_consent(user, True, settings.media_consent_policy_version)
     user = first_auth.authenticate(login.access_token)
@@ -240,14 +267,32 @@ def test_media_and_operations_survive_database_reinitialization(tmp_path: Path) 
         True,
         str(uuid4()),
     )
-    operation, _ = first_media.start_image_enhancement(
+    image_operation, _ = first_media.start_image_enhancement(
         user,
         draft.id,
         image.id,
         ImageEnhancementRequest(),
         str(uuid4()),
     )
-    first_media.complete_image_enhancement(user.id, operation.id)
+    first_media.complete_image_enhancement(user.id, image_operation.id)
+    voice = first_voice.upload_voice_note(
+        user,
+        draft.id,
+        wav_bytes(),
+        "hi",
+        str(uuid4()),
+    )
+    listing_operation, _ = first_voice.start_listing_generation(
+        user,
+        draft.id,
+        GenerateListingRequest(
+            voice_note_id=voice.id,
+            image_id=image.id,
+            target_languages=["hi", "en"],
+        ),
+        str(uuid4()),
+    )
+    first_voice.complete_listing_generation(user.id, listing_operation.id)
     first_database.dispose()
 
     second_database = Database(settings)
@@ -260,11 +305,17 @@ def test_media_and_operations_survive_database_reinitialization(tmp_path: Path) 
     )
     restored_user = second_auth.authenticate(login.access_token)
     restored_draft = second_catalog.get_draft(restored_user, draft.id)
-    restored_operation = second_media.get_operation(restored_user, operation.id)
+    restored_image_operation = second_media.get_operation(restored_user, image_operation.id)
+    restored_listing_operation = second_media.get_operation(restored_user, listing_operation.id)
 
-    assert restored_operation.status == "succeeded"
+    assert restored_image_operation.status == "succeeded"
+    assert restored_listing_operation.status == "succeeded"
     assert restored_draft.images[0].enhancement_status == "succeeded"
     assert restored_draft.images[0].enhanced_url is not None
+    assert restored_draft.voice_notes[0].id == voice.id
+    assert restored_draft.transcript is not None
+    assert restored_draft.transcript.text == "हाथ से बना कपड़े का उत्पाद"
     assert len(list(media_path.rglob("original.jpg"))) == 1
+    assert len(list(media_path.rglob("original.wav"))) == 1
     assert len(list(media_path.rglob("enhanced.jpg"))) == 1
     second_database.dispose()

@@ -46,6 +46,8 @@ Implemented routes:
 - `POST /api/v1/catalog/drafts/{draft_id}/images`
 - `POST /api/v1/catalog/drafts/{draft_id}/images/{image_id}/enhance`
 - `PATCH /api/v1/catalog/drafts/{draft_id}/images/{image_id}`
+- `POST /api/v1/catalog/drafts/{draft_id}/voice-notes`
+- `POST /api/v1/catalog/drafts/{draft_id}/generate-listing`
 - `GET /api/v1/operations/{operation_id}`
 
 Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
@@ -68,6 +70,25 @@ unguessable but not authenticated. Do not use it for private production draft
 media; production must use a private object store with short-lived signed URLs.
 The original is never replaced, and an enhanced image is used only after the
 artisan explicitly selects that variant.
+
+## Local speech transcription
+
+Voice uploads accept decoded M4A, MP3, WAV, or WebM audio up to 25 MB and 120
+seconds. The original bytes, duration, hash, language, and idempotent response
+snapshot are persisted. Listing generation transcribes the selected voice note
+with local `faster-whisper`; no speech API key or BHASHINI credential is used.
+
+The model is loaded lazily on the first generation request. The default
+`WHISPER_MODEL_SIZE=small`, CPU `int8` configuration favors Hindi accuracy while
+remaining practical on a development laptop. The first request downloads the
+model into `WHISPER_MODEL_CACHE_DIR`; pre-warm that cache while online before a
+demo. Model files are ignored by Git.
+
+The current catalogue-generation provider is intentionally conservative: it
+stores the real transcript and creates only a grounded listing scaffold. It
+does not translate or infer unspoken product facts; missing fields remain
+explicit for artisan confirmation. A later LLM provider can fill those fields
+behind the same frozen HTTP contract.
 
 ## Database migrations
 

@@ -32,7 +32,7 @@ request OTP -> verify OTP -> create draft -> upload image -> upload voice
 | 3 | Artisan profile | `/me` | `mocked` |
 | 4 | Catalogue drafts | `/catalog/drafts*` | `mocked` |
 | 5 | Image upload and enhancement | draft image routes | `mocked` |
-| 6 | Voice upload and listing generation | draft voice and generation routes | `planned` |
+| 6 | Voice upload and listing generation | draft voice and generation routes | `mocked` |
 | 7 | Explainable pricing | draft pricing route | `planned` |
 | 8 | Approval and buyer sharing | approve, share, and enquiry routes | `planned` |
 
@@ -831,3 +831,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | 2026-08-29 | `0.2.0-frozen` | clarification | Froze the reviewed contract after defining the effective health URL, OTP replay order, single-primary-image invariant, image PATCH version requirement, approved-draft immutability, and configured public share origin. |
 | 2026-08-30 | `0.2.0-frozen` | status | Marked implemented health, authentication, profile, and catalogue draft routes as mocked pending Flutter verification. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | status | Marked image upload, deterministic mock enhancement, image selection, and operation polling as mocked pending Flutter verification. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | status | Marked voice upload, local faster-whisper transcription, grounded listing scaffold, and generation polling as mocked pending Flutter verification. No HTTP interface changed. |

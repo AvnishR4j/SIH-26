@@ -17,6 +17,7 @@ backend/*.db-shm
 backend/*.db-wal
 backend/.test-media-*/
 media/
+models/
 .venv/
 venv/
 
