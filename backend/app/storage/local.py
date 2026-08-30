@@ -1,10 +1,11 @@
 import os
 from functools import lru_cache
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from app.core.config import REPOSITORY_ROOT, Settings, get_settings
 from app.core.errors import ApiError
+from app.storage.base import normalized_media_key
 
 
 def local_media_root(settings: Settings) -> Path:
@@ -24,6 +25,9 @@ class LocalMediaStorage:
             self.root.mkdir(parents=True, exist_ok=True)
         except OSError as error:
             raise ApiError(503, "STORAGE_UNAVAILABLE", "Media storage is unavailable.") from error
+
+    def is_available(self) -> bool:
+        return self.root.is_dir() and os.access(self.root, os.R_OK | os.W_OK)
 
     def save(self, key: str, content: bytes) -> None:
         destination = self._path(key)
@@ -55,27 +59,15 @@ class LocalMediaStorage:
             return
 
     def url(self, key: str) -> str:
-        normalized = self._normalized_key(key)
+        normalized = normalized_media_key(key)
         return f"{self.url_base}/{normalized}"
 
     def _path(self, key: str) -> Path:
-        normalized = self._normalized_key(key)
+        normalized = normalized_media_key(key)
         path = (self.root / normalized).resolve()
         if not path.is_relative_to(self.root):
             raise ApiError(500, "INTERNAL_ERROR", "The media key is invalid.")
         return path
-
-    @staticmethod
-    def _normalized_key(key: str) -> str:
-        path = PurePosixPath(key)
-        if (
-            path.is_absolute()
-            or not path.parts
-            or any(part in {"", ".", ".."} for part in path.parts)
-        ):
-            raise ApiError(500, "INTERNAL_ERROR", "The media key is invalid.")
-        return path.as_posix()
-
 
 @lru_cache
 def get_media_storage() -> LocalMediaStorage:

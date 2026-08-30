@@ -39,12 +39,21 @@ from app.schemas.catalog import (
     ProductFields,
 )
 from app.services.auth import UserRecord
+from app.services.media_urls import refresh_draft_image_urls
+from app.storage.base import MediaStorage
+from app.storage.factory import create_media_storage, get_media_storage
 
 
 class CatalogService:
-    def __init__(self, settings: Settings, database: Database | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        database: Database | None = None,
+        storage: MediaStorage | None = None,
+    ) -> None:
         self.settings = settings
         self.database = database or get_database()
+        self.storage = storage or create_media_storage(settings)
         self._lock = self.database.write_lock
 
     def reset(self) -> None:
@@ -147,20 +156,26 @@ class CatalogService:
 
         with self.database.session() as session:
             rows = list(session.scalars(statement))
-        has_next = len(rows) > limit
-        page = rows[:limit]
-        next_cursor = None
-        if has_next:
-            last = page[-1]
-            next_cursor = self._encode_cursor(ensure_utc(last.updated_at), last.id)
-        return DraftList(
-            items=[self._summary(self._draft(row)) for row in page],
-            next_cursor=next_cursor,
-        )
+            has_next = len(rows) > limit
+            page = rows[:limit]
+            next_cursor = None
+            if has_next:
+                last = page[-1]
+                next_cursor = self._encode_cursor(ensure_utc(last.updated_at), last.id)
+            return DraftList(
+                items=[
+                    self._summary(
+                        refresh_draft_image_urls(session, self._draft(row), self.storage)
+                    )
+                    for row in page
+                ],
+                next_cursor=next_cursor,
+            )
 
     def get_draft(self, user: UserRecord, draft_id: str) -> Draft:
         with self.database.session() as session:
-            return self._owned_draft(session, user.id, draft_id)
+            draft = self._owned_draft(session, user.id, draft_id)
+            return refresh_draft_image_urls(session, draft, self.storage)
 
     def update_draft(self, user: UserRecord, draft_id: str, request: DraftPatch) -> Draft:
         with self._lock, self.database.session() as session, session.begin():
@@ -226,7 +241,7 @@ class CatalogService:
                 if current is None:
                     raise ApiError(404, "NOT_FOUND", "The draft was not found.")
                 raise self._version_conflict(current)
-            return updated
+            return refresh_draft_image_urls(session, updated, self.storage)
 
     def _owned_draft(self, session: Session, owner_id: str, draft_id: str) -> Draft:
         row = session.scalar(
@@ -363,4 +378,4 @@ class CatalogService:
 
 @lru_cache
 def get_catalog_service() -> CatalogService:
-    return CatalogService(get_settings(), get_database())
+    return CatalogService(get_settings(), get_database(), get_media_storage())

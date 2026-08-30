@@ -337,7 +337,10 @@ Effective client route: `GET /api/v1/health`. Auth: public. Success: `200 OK`.
 }
 ```
 
-`status` may be `ok` or `degraded`. A degraded response still uses HTTP 200 when the API can serve basic requests.
+`status` may be `ok` or `degraded`. It is `ok` only when the database and configured
+media storage are reachable; Supabase storage also verifies that the draft bucket
+is private and the published-image bucket is public. A degraded response still
+uses HTTP 200 when the API can serve basic requests.
 
 ### 2. Authentication
 
@@ -836,3 +839,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | 2026-08-30 | `0.2.0-frozen` | status | Marked approval, immutable catalogue snapshots, public sharing, and consented buyer enquiries as mocked pending Flutter verification. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | security | Hardened concurrent idempotent retries, production URL and storage validation, and dependency security. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | status | Added optional schema-validated Gemini catalogue extraction with transcript evidence checks, artisan-value precedence, contact-data filtering, and deterministic mock fallback. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | security | Added private/public Supabase Storage routing, expiring draft-media URLs with response-time refresh, server-only credentials, and storage-aware health checks. No HTTP interface changed. |

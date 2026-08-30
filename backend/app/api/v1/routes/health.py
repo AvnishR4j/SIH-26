@@ -6,6 +6,8 @@ from app.core.config import Settings, get_settings
 from app.core.errors import error_responses
 from app.db.session import Database, get_database
 from app.schemas.health import HealthResponse
+from app.storage.base import MediaStorage
+from app.storage.factory import get_media_storage
 
 router = APIRouter(tags=["health"])
 
@@ -14,9 +16,10 @@ router = APIRouter(tags=["health"])
 def get_health(
     settings: Annotated[Settings, Depends(get_settings)],
     database: Annotated[Database, Depends(get_database)],
+    storage: Annotated[MediaStorage, Depends(get_media_storage)],
 ) -> HealthResponse:
     return HealthResponse(
-        status="ok" if database.is_available() else "degraded",
+        status="ok" if database.is_available() and storage.is_available() else "degraded",
         service="kalasetu-api",
         version=settings.app_version,
         environment=settings.environment,
