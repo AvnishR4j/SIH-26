@@ -69,6 +69,21 @@ are idempotent, and the first image is always the draft's primary image. The
 mock enhancement provider produces a deterministic square JPEG so frontend
 integration can exercise the complete asynchronous operation-polling flow.
 
+Set `IMAGE_ENHANCEMENT_PROVIDER=rembg` for the real local provider. It uses the
+configured U2-Net-family model for neutral-background removal and restrained
+OpenCV CLAHE/sharpening for lighting and detail correction. The model downloads
+lazily into `REMBG_MODEL_CACHE_DIR`; pre-warm that cache before a demo. Choosing
+`keep_original` skips segmentation while retaining local lighting correction.
+Enhancement works on a copy capped by `IMAGE_ENHANCEMENT_MAX_SIDE` to bound
+memory and inference time. The full-resolution source is never overwritten, and
+the enhanced image is not selected or published until the artisan explicitly
+chooses it.
+
+Background removal can fail on reflective objects, fine embroidery edges,
+shadows, or products touching the frame. Test those cases with consented pilot
+photos and keep the before/after approval UI; enhancement is assistance, not a
+claim that marketplace image requirements are guaranteed.
+
 `MEDIA_STORAGE=local` writes files atomically beneath `MEDIA_LOCAL_DIR` and
 serves them from `MEDIA_URL_BASE`. This is a development adapter: its URLs are
 unguessable but not authenticated. Do not use it for private production draft
