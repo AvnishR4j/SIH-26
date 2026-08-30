@@ -1,7 +1,7 @@
 from functools import lru_cache
 from threading import RLock
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -52,6 +52,19 @@ class Database:
 
     def create_schema(self) -> None:
         Base.metadata.create_all(self.engine)
+        self._seed_reference_data()
+
+    def _seed_reference_data(self) -> None:
+        from app.db.models import PricingBenchmark
+        from app.db.reference_data import PRICING_BENCHMARKS
+
+        with self.session() as session, session.begin():
+            existing = set(session.scalars(select(PricingBenchmark.category)))
+            session.add_all(
+                PricingBenchmark(**row)
+                for row in PRICING_BENCHMARKS
+                if row["category"] not in existing
+            )
 
     def drop_schema(self) -> None:
         Base.metadata.drop_all(self.engine)

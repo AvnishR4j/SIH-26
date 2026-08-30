@@ -1,10 +1,12 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -235,6 +237,41 @@ class VoiceUploadIdempotency(Base):
     response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
     voice_id: Mapped[str] = mapped_column(
         ForeignKey("voice_media.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class PricingBenchmark(Base):
+    __tablename__ = "pricing_benchmarks"
+    __table_args__ = (
+        CheckConstraint("low_paise >= 0", name="low_non_negative"),
+        CheckConstraint("high_paise >= low_paise", name="range_allowed"),
+    )
+
+    category: Mapped[str] = mapped_column(String(80), primary_key=True)
+    low_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    high_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_label: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_demo_data: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class PricingSuggestionIdempotency(Base):
+    __tablename__ = "pricing_suggestion_idempotency"
+    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    draft_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_drafts.id", ondelete="CASCADE"), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

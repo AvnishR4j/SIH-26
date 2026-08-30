@@ -23,12 +23,14 @@ from app.schemas.catalog import (
     DraftPatch,
     GenerateListingRequest,
     ImageEnhancementRequest,
+    PricingSuggestionRequest,
     ProductFieldsUpdate,
 )
 from app.schemas.profile import ProfileUpdate
 from app.services.auth import AuthService
 from app.services.catalog import CatalogService
 from app.services.media import MediaService
+from app.services.pricing import PricingService
 from app.services.speech import TranscriptionResult
 from app.services.voice import VoiceService
 from app.storage.local import LocalMediaStorage
@@ -123,6 +125,45 @@ def test_profile_token_and_draft_survive_database_reinitialization(tmp_path: Pat
     assert restored_profile.craft_categories == ["textile", "embroidery"]
     assert restored_draft.version == 2
     assert restored_draft.fields.material == "cotton"
+    second_database.dispose()
+
+
+def test_pricing_and_replay_survive_database_reinitialization(tmp_path: Path) -> None:
+    settings = database_settings(tmp_path / "pricing-restart.db")
+    first_database = Database(settings)
+    first_auth = AuthService(settings, first_database)
+    first_catalog = CatalogService(settings, first_database)
+    first_pricing = PricingService(settings, first_database)
+    login, user = authenticated_user(first_auth)
+    draft = first_catalog.create_draft(
+        user,
+        DraftCreate(craft_category="textile", source_language="hi"),
+        str(uuid4()),
+    )
+    key = str(uuid4())
+    request = PricingSuggestionRequest(
+        version=1,
+        material_cost_paise=30_000,
+        labour_hours=8,
+        hourly_rate_paise=5_000,
+        packaging_cost_paise=5_000,
+        logistics_buffer_paise=0,
+        benchmark_category="cotton_dupatta",
+    )
+    original = first_pricing.suggest_price(user, draft.id, request, key)
+    first_database.dispose()
+
+    second_database = Database(settings)
+    second_auth = AuthService(settings, second_database)
+    second_catalog = CatalogService(settings, second_database)
+    second_pricing = PricingService(settings, second_database)
+    restored_user = second_auth.authenticate(login.access_token)
+    restored = second_catalog.get_draft(restored_user, draft.id)
+    replay = second_pricing.suggest_price(restored_user, draft.id, request, key)
+
+    assert restored.version == 2
+    assert restored.pricing == original
+    assert replay == original
     second_database.dispose()
 
 

@@ -19,6 +19,7 @@ from app.db.models import (
     MediaObject,
     Operation,
     OperationIdempotency,
+    PricingSuggestionIdempotency,
     VoiceMedia,
     VoiceUploadIdempotency,
 )
@@ -48,6 +49,7 @@ class CatalogService:
             session.execute(delete(Operation))
             session.execute(delete(VoiceUploadIdempotency))
             session.execute(delete(VoiceMedia))
+            session.execute(delete(PricingSuggestionIdempotency))
             session.execute(delete(ImageUploadIdempotency))
             session.execute(delete(MediaObject))
             session.execute(delete(DraftCreateIdempotency))
@@ -164,6 +166,8 @@ class CatalogService:
                 "version": draft.version + 1,
                 "updated_at": datetime.now(UTC),
             }
+            if draft.status == "ready_for_approval":
+                updates["status"] = "needs_confirmation"
             if request.fields is not None:
                 supplied = request.fields.model_dump(exclude_unset=True)
                 updates["fields"] = draft.fields.model_copy(update=supplied)

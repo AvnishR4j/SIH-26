@@ -144,21 +144,45 @@ class Transcript(StrictModel):
 
 
 class PricingBreakdown(StrictModel):
-    material_cost_paise: int
-    labour_cost_paise: int
-    packaging_cost_paise: int
-    logistics_buffer_paise: int
-    minimum_sustainable_price_paise: int
-    market_reference_low_paise: int
-    market_reference_high_paise: int
+    material_cost_paise: int = Field(ge=0)
+    labour_cost_paise: int = Field(ge=0)
+    packaging_cost_paise: int = Field(ge=0)
+    logistics_buffer_paise: int = Field(ge=0)
+    minimum_sustainable_price_paise: int = Field(ge=0)
+    market_reference_low_paise: int = Field(ge=0)
+    market_reference_high_paise: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_market_range(self) -> "PricingBreakdown":
+        if self.market_reference_high_paise < self.market_reference_low_paise:
+            raise ValueError("Market reference high must not be below market reference low.")
+        return self
+
+
+class PricingSuggestionRequest(StrictModel):
+    version: int = Field(ge=1)
+    material_cost_paise: int = Field(ge=0)
+    labour_hours: float = Field(gt=0, le=10_000, allow_inf_nan=False)
+    hourly_rate_paise: int = Field(ge=0)
+    packaging_cost_paise: int = Field(ge=0)
+    logistics_buffer_paise: int = Field(ge=0)
+    benchmark_category: str = Field(min_length=1, max_length=80)
+
+    @field_validator("benchmark_category")
+    @classmethod
+    def normalize_benchmark_category(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if not cleaned:
+            raise ValueError("Benchmark category cannot be blank.")
+        return cleaned
 
 
 class PricingSuggestion(StrictModel):
     draft_id: str
     draft_version: int
-    suggested_min_paise: int
-    suggested_max_paise: int
-    recommended_paise: int
+    suggested_min_paise: int = Field(ge=0)
+    suggested_max_paise: int = Field(ge=0)
+    recommended_paise: int = Field(ge=0)
     confidence: Literal["low", "medium", "high"]
     breakdown: PricingBreakdown
     reasons: list[str]
@@ -166,6 +190,12 @@ class PricingSuggestion(StrictModel):
     benchmark_source_label: str
     benchmark_source_date: date
     is_demo_data: bool
+
+    @model_validator(mode="after")
+    def validate_suggestion_range(self) -> "PricingSuggestion":
+        if not (self.suggested_min_paise <= self.recommended_paise <= self.suggested_max_paise):
+            raise ValueError("Recommended price must be inside the suggested range.")
+        return self
 
 
 class DraftCreate(StrictModel):

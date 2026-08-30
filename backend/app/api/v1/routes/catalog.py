@@ -17,6 +17,7 @@ from app.api.dependencies import (
     CatalogServiceDependency,
     CurrentUser,
     MediaServiceDependency,
+    PricingServiceDependency,
     VoiceServiceDependency,
 )
 from app.core.errors import error_responses
@@ -30,6 +31,8 @@ from app.schemas.catalog import (
     DraftStatus,
     GenerateListingRequest,
     ImageEnhancementRequest,
+    PricingSuggestion,
+    PricingSuggestionRequest,
     VoiceNote,
 )
 from app.schemas.operations import OperationResponse
@@ -217,3 +220,23 @@ def generate_listing(
             operation.id,
         )
     return operation
+
+
+@router.post(
+    "/drafts/{draft_id}/pricing/suggest",
+    response_model=PricingSuggestion,
+    responses=error_responses(400, 401, 404, 409, 422, 500),
+)
+def suggest_price(
+    draft_id: str,
+    body: PricingSuggestionRequest,
+    user: CurrentUser,
+    service: PricingServiceDependency,
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> PricingSuggestion:
+    return service.suggest_price(
+        user,
+        draft_id,
+        body,
+        str(idempotency_key),
+    )

@@ -24,6 +24,7 @@ from app.db.models import (
     OtpAttempt,
     OtpIdempotency,
     OtpRequest,
+    PricingSuggestionIdempotency,
     User,
     VoiceMedia,
     VoiceUploadIdempotency,
@@ -60,6 +61,7 @@ class AuthService:
             session.execute(delete(Operation))
             session.execute(delete(VoiceUploadIdempotency))
             session.execute(delete(VoiceMedia))
+            session.execute(delete(PricingSuggestionIdempotency))
             session.execute(delete(ImageUploadIdempotency))
             session.execute(delete(MediaObject))
             session.execute(delete(DraftCreateIdempotency))
