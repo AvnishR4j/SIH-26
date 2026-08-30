@@ -18,6 +18,7 @@ from app.api.dependencies import (
     CurrentUser,
     MediaServiceDependency,
     PricingServiceDependency,
+    SharingServiceDependency,
     VoiceServiceDependency,
 )
 from app.core.errors import error_responses
@@ -36,6 +37,7 @@ from app.schemas.catalog import (
     VoiceNote,
 )
 from app.schemas.operations import OperationResponse
+from app.schemas.sharing import ApprovalRequest, ApprovedCatalog
 
 router = APIRouter(tags=["catalogue drafts"])
 
@@ -240,3 +242,19 @@ def suggest_price(
         body,
         str(idempotency_key),
     )
+
+
+@router.post(
+    "/drafts/{draft_id}/approve",
+    response_model=ApprovedCatalog,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 404, 409, 422, 500),
+)
+def approve_draft(
+    draft_id: str,
+    body: ApprovalRequest,
+    user: CurrentUser,
+    service: SharingServiceDependency,
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> ApprovedCatalog:
+    return service.approve_draft(user, draft_id, body, str(idempotency_key))

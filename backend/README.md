@@ -50,7 +50,10 @@ Implemented routes:
 - `POST /api/v1/catalog/drafts/{draft_id}/voice-notes`
 - `POST /api/v1/catalog/drafts/{draft_id}/generate-listing`
 - `POST /api/v1/catalog/drafts/{draft_id}/pricing/suggest`
+- `POST /api/v1/catalog/drafts/{draft_id}/approve`
 - `GET /api/v1/operations/{operation_id}`
+- `GET /api/v1/share/{public_share_id}`
+- `POST /api/v1/share/{public_share_id}/enquiries`
 
 Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
 latest `version`; stale writes return `409 VERSION_CONFLICT` so the frontend can
@@ -106,6 +109,25 @@ and integration testing. Replace them with reviewed, attributable benchmark
 data before production use. Pricing requests require both the current draft
 `version` and a UUID `Idempotency-Key`; retries return the original response
 without incrementing the draft twice.
+
+## Approval and public sharing
+
+Approval revalidates every required field, the selected primary image, complete
+Hindi and English listing text, current pricing, and relevant active operations.
+Prices outside the suggested range require an artisan override reason. A
+successful approval atomically marks the draft immutable and creates a separate
+catalogue snapshot; retries return the original snapshot.
+
+Only public-safe fields are copied into that snapshot. The selected image is
+published under an opaque share-media path, so public URLs do not disclose user,
+draft, image, or private storage identifiers. Public share responses omit phone
+numbers, cost inputs, pricing confidence, AI metadata, and unselected media.
+Buyer enquiries require explicit contact consent, use share-scoped idempotency,
+and are rate-limited per buyer phone and catalogue.
+
+`MEDIA_STORAGE=local` supports this flow for development. Production must use a
+private draft-media store plus a deliberate public publishing adapter for the
+artisan-selected share image.
 
 ## Database migrations
 

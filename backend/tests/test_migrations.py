@@ -21,6 +21,10 @@ APPLICATION_TABLES = {
     "voice_upload_idempotency",
     "pricing_benchmarks",
     "pricing_suggestion_idempotency",
+    "catalog_snapshots",
+    "approval_idempotency",
+    "buyer_enquiries",
+    "enquiry_idempotency",
 }
 
 

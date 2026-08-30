@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     otp_max_requests_per_15_minutes: int = 5
     otp_idempotency_ttl_seconds: int = 60
     idempotency_ttl_seconds: int = 86400
+    enquiry_max_per_hour_per_buyer: int = Field(default=5, ge=1, le=100)
     dev_otp: str | None = "123456"
     media_consent_policy_version: str = "2026-08-29"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/kalasetu"
@@ -72,6 +73,14 @@ class Settings(BaseSettings):
             raise ValueError("MEDIA_URL_BASE must be an absolute HTTP(S) URL")
         return normalized
 
+    @field_validator("public_share_web_base_url")
+    @classmethod
+    def validate_public_share_web_base_url(cls, value: str) -> str:
+        normalized = value.rstrip("/")
+        if not normalized.startswith(("http://", "https://")):
+            raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must be an absolute HTTP(S) URL")
+        return normalized
+
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
         if self.environment == "production" and self.dev_otp is not None:
@@ -88,6 +97,10 @@ class Settings(BaseSettings):
             )
         if self.environment == "production" and not self.media_url_base.startswith("https://"):
             raise ValueError("MEDIA_URL_BASE must use HTTPS in production")
+        if self.environment == "production" and not self.public_share_web_base_url.startswith(
+            "https://"
+        ):
+            raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must use HTTPS in production")
         return self
 
 

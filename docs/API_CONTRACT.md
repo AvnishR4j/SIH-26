@@ -34,7 +34,7 @@ request OTP -> verify OTP -> create draft -> upload image -> upload voice
 | 5 | Image upload and enhancement | draft image routes | `mocked` |
 | 6 | Voice upload and listing generation | draft voice and generation routes | `mocked` |
 | 7 | Explainable pricing | draft pricing route | `mocked` |
-| 8 | Approval and buyer sharing | approve, share, and enquiry routes | `planned` |
+| 8 | Approval and buyer sharing | approve, share, and enquiry routes | `mocked` |
 
 Allowed status values:
 

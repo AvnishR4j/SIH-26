@@ -8,6 +8,7 @@ from app.services.auth import AuthService, UserRecord, get_auth_service
 from app.services.catalog import CatalogService, get_catalog_service
 from app.services.media import MediaService, get_media_service
 from app.services.pricing import PricingService, get_pricing_service
+from app.services.sharing import SharingService, get_sharing_service
 from app.services.voice import VoiceService, get_voice_service
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -28,3 +29,4 @@ CatalogServiceDependency = Annotated[CatalogService, Depends(get_catalog_service
 MediaServiceDependency = Annotated[MediaService, Depends(get_media_service)]
 VoiceServiceDependency = Annotated[VoiceService, Depends(get_voice_service)]
 PricingServiceDependency = Annotated[PricingService, Depends(get_pricing_service)]
+SharingServiceDependency = Annotated[SharingService, Depends(get_sharing_service)]
