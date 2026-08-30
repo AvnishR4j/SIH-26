@@ -102,6 +102,18 @@ def test_expired_access_token_is_rejected() -> None:
     assert error.value.code == "UNAUTHORIZED"
 
 
+def test_otp_without_delivery_configuration_fails_closed() -> None:
+    service = AuthService(settings(environment="test", dev_otp=None))
+
+    with pytest.raises(ApiError) as error:
+        service.request_otp("+919999999999", str(uuid4()))
+
+    assert error.value.status_code == 503
+    assert error.value.code == "SERVICE_UNAVAILABLE"
+    with service.database.session() as session:
+        assert session.scalar(select(func.count(OtpRequest.id))) == 0
+
+
 def test_otp_rate_limit_and_retry_are_atomic() -> None:
     service = AuthService(
         settings(

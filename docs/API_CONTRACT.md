@@ -344,7 +344,11 @@ uses HTTP 200 when the API can serve basic requests.
 
 ### 2. Authentication
 
-For the prototype, OTP delivery may be mocked or console-logged in development. Production-like responses must not reveal whether a phone number already exists.
+For the prototype, OTP delivery uses the configured development code. When no
+delivery mechanism is configured, requests fail closed with `503
+SERVICE_UNAVAILABLE`; the backend never creates an undeliverable random code.
+Production-like responses must not reveal whether a phone number already
+exists. A real deployment requires a reviewed SMS provider adapter.
 
 #### `POST /auth/request-otp`
 
@@ -841,3 +845,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | 2026-08-30 | `0.2.0-frozen` | status | Added optional schema-validated Gemini catalogue extraction with transcript evidence checks, artisan-value precedence, contact-data filtering, and deterministic mock fallback. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | security | Added private/public Supabase Storage routing, expiring draft-media URLs with response-time refresh, server-only credentials, and storage-aware health checks. No HTTP interface changed. |
 | 2026-08-30 | `0.2.0-frozen` | status | Added optional local rembg/U2-Net background removal and OpenCV lighting/detail correction behind the existing enhancement operation, with the deterministic mock fallback retained. No HTTP interface changed. |
+| 2026-08-30 | `0.2.0-frozen` | security | Made unconfigured OTP delivery fail closed and removed unused environment-template flags. No successful response shape changed. |
