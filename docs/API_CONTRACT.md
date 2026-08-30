@@ -27,10 +27,10 @@ request OTP -> verify OTP -> create draft -> upload image -> upload voice
 
 | Priority | Capability | Endpoint group | Status |
 | --- | --- | --- | --- |
-| 1 | Service check | `GET /api/v1/health` | `planned` |
-| 2 | OTP login | `/auth/*` | `planned` |
-| 3 | Artisan profile | `/me` | `planned` |
-| 4 | Catalogue drafts | `/catalog/drafts*` | `planned` |
+| 1 | Service check | `GET /api/v1/health` | `mocked` |
+| 2 | OTP login | `/auth/*` | `mocked` |
+| 3 | Artisan profile | `/me` | `mocked` |
+| 4 | Catalogue drafts | `/catalog/drafts*` | `mocked` |
 | 5 | Image upload and enhancement | draft image routes | `planned` |
 | 6 | Voice upload and listing generation | draft voice and generation routes | `planned` |
 | 7 | Explainable pricing | draft pricing route | `planned` |
@@ -829,3 +829,4 @@ Do not build frontend assumptions for deferred routes until they are added to th
 | 2026-08-29 | `0.2.0-draft` | behavioral | Normalized draft schemas; added status codes, lifecycle, pagination, idempotency, upload constraints, operation polling, version protection, privacy boundaries, and change governance. |
 | 2026-08-29 | `0.2.0-draft` | clarification | Defined public-route idempotency scope and OTP window, approval readiness, media status values, operation location header, and complete pricing breakdown. |
 | 2026-08-29 | `0.2.0-frozen` | clarification | Froze the reviewed contract after defining the effective health URL, OTP replay order, single-primary-image invariant, image PATCH version requirement, approved-draft immutability, and configured public share origin. |
+| 2026-08-30 | `0.2.0-frozen` | status | Marked implemented health, authentication, profile, and catalogue draft routes as mocked pending Flutter verification. No HTTP interface changed. |

@@ -11,6 +11,10 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
 .venv/
 venv/
 
