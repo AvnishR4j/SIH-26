@@ -27,12 +27,16 @@ from app.db.session import Database, get_database
 from app.schemas.catalog import (
     Draft,
     GenerateListingRequest,
-    Listing,
     Transcript,
     VoiceNote,
 )
 from app.schemas.operations import OperationResponse
 from app.services.auth import UserRecord
+from app.services.catalogue_generation import (
+    CatalogueGenerationResult,
+    CatalogueGenerator,
+    get_catalogue_generator,
+)
 from app.services.speech import SpeechTranscriber, get_speech_transcriber
 from app.storage.local import LocalMediaStorage, get_media_storage
 
@@ -54,11 +58,13 @@ class VoiceService:
         database: Database | None = None,
         storage: LocalMediaStorage | None = None,
         transcriber: SpeechTranscriber | None = None,
+        catalogue_generator: CatalogueGenerator | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
         self.storage = storage or get_media_storage()
         self.transcriber = transcriber or get_speech_transcriber()
+        self.catalogue_generator = catalogue_generator or get_catalogue_generator()
         self._lock = self.database.write_lock
 
     def upload_voice_note(
@@ -321,25 +327,28 @@ class VoiceService:
                 if operation is None or operation.status != "running":
                     return
                 draft = Draft.model_validate(row.payload)
-                listing = self._grounded_listing(
+                generation = self.catalogue_generator.generate(
                     draft,
                     result.text,
                     result.language,
                     list(payload["target_languages"]),
                 )
+                generation = self._preserve_existing_values(draft, generation)
                 missing_fields = [
-                    name for name, value in draft.fields.model_dump().items() if value is None
+                    name for name, value in generation.fields.model_dump().items() if value is None
                 ]
                 updated = draft.model_copy(
                     update={
                         "version": draft.version + 1,
                         "status": "needs_confirmation",
-                        "listing": listing,
+                        "fields": generation.fields,
+                        "listing": generation.listing,
                         "transcript": Transcript(
                             voice_note_id=str(payload["voice_note_id"]),
                             language=result.language,
                             text=result.text,
                         ),
+                        "field_confidence": generation.field_confidence,
                         "missing_fields": missing_fields,
                         "last_processing_error": None,
                         "updated_at": now,
@@ -445,41 +454,6 @@ class VoiceService:
             raise ApiError(422, "VALIDATION_ERROR", "The audio file contains no samples.")
         return (*audio_format, max(1, math.ceil(duration)))
 
-    @staticmethod
-    def _grounded_listing(
-        draft: Draft,
-        text: str,
-        language: str,
-        target_languages: list[str],
-    ) -> Listing:
-        existing = draft.listing or Listing(
-            title_hi=None,
-            title_en=None,
-            description_hi=None,
-            description_en=None,
-            tags=[],
-        )
-        title_hi = existing.title_hi
-        title_en = existing.title_en
-        description_hi = existing.description_hi
-        description_en = existing.description_en
-        if "hi" in target_languages:
-            title_hi = title_hi or draft.craft_category
-            if language == "hi":
-                description_hi = description_hi or text
-        if "en" in target_languages:
-            title_en = title_en or draft.craft_category
-            if language == "en":
-                description_en = description_en or text
-        tags = existing.tags or [draft.craft_category]
-        return Listing(
-            title_hi=title_hi,
-            title_en=title_en,
-            description_hi=description_hi,
-            description_en=description_en,
-            tags=tags,
-        )
-
     def _require_current_consent(self, user: UserRecord) -> None:
         if not user.media_processing_accepted or (
             user.policy_version != self.settings.media_consent_policy_version
@@ -490,6 +464,38 @@ class VoiceService:
                 "Accept the current media-processing policy before using AI features.",
                 {"policy_version": self.settings.media_consent_policy_version},
             )
+
+    @staticmethod
+    def _preserve_existing_values(
+        draft: Draft,
+        generation: CatalogueGenerationResult,
+    ) -> CatalogueGenerationResult:
+        field_values = generation.fields.model_dump()
+        confidence = dict(generation.field_confidence)
+        for name, existing in draft.fields.model_dump().items():
+            if existing is None:
+                continue
+            field_values[name] = existing
+            if name in draft.field_confidence:
+                confidence[name] = draft.field_confidence[name]
+            else:
+                confidence.pop(name, None)
+
+        listing_values = generation.listing.model_dump()
+        if draft.listing is not None:
+            for name in ("title_hi", "title_en", "description_hi", "description_en"):
+                existing = getattr(draft.listing, name)
+                if existing is not None:
+                    listing_values[name] = existing
+            if draft.listing.tags:
+                listing_values["tags"] = draft.listing.tags
+        return generation.model_copy(
+            update={
+                "fields": generation.fields.model_copy(update=field_values),
+                "listing": generation.listing.model_copy(update=listing_values),
+                "field_confidence": confidence,
+            }
+        )
 
     @staticmethod
     def _ensure_editable(draft: Draft) -> None:
@@ -593,4 +599,5 @@ def get_voice_service() -> VoiceService:
         get_database(),
         get_media_storage(),
         get_speech_transcriber(),
+        get_catalogue_generator(),
     )

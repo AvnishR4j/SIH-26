@@ -51,6 +51,8 @@ class Database:
         return self.session_factory()
 
     def create_schema(self) -> None:
+        from app.db import models  # noqa: F401
+
         Base.metadata.create_all(self.engine)
         self._seed_reference_data()
 

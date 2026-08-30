@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore:'_UnionGenericAlias' is deprecated.*:DeprecationWarning:google\\.genai\\.types",
+]
 
 [tool.ruff]
 line-length = 100

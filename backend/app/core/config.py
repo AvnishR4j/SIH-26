@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     max_audio_bytes: int = Field(default=26_214_400, ge=1)
     max_audio_duration_seconds: int = Field(default=120, ge=1, le=120)
     ai_operation_poll_after_seconds: int = Field(default=2, ge=1, le=60)
+    ai_provider_timeout_seconds: int = Field(default=45, ge=1, le=120)
     image_enhancement_provider: Literal["mock"] = "mock"
     speech_provider: Literal["faster_whisper"] = "faster_whisper"
     whisper_model_size: str = "small"
@@ -56,13 +57,16 @@ class Settings(BaseSettings):
     whisper_compute_type: str = "int8"
     whisper_cpu_threads: int = Field(default=4, ge=1, le=64)
     whisper_model_cache_dir: Path = Path("./models/faster-whisper")
+    catalogue_generation_provider: Literal["mock", "gemini"] = "mock"
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
 
-    @field_validator("whisper_model_size", "whisper_compute_type")
+    @field_validator("whisper_model_size", "whisper_compute_type", "gemini_model")
     @classmethod
-    def reject_blank_whisper_setting(cls, value: str) -> str:
+    def reject_blank_provider_setting(cls, value: str) -> str:
         cleaned = value.strip()
         if not cleaned:
-            raise ValueError("Whisper model settings cannot be blank")
+            raise ValueError("Provider model settings cannot be blank")
         return cleaned
 
     @field_validator("media_url_base")
@@ -111,6 +115,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MEDIA_STORAGE=local is development-only; configure private object storage"
             )
+        if self.catalogue_generation_provider == "gemini" and (
+            self.gemini_api_key is None or not self.gemini_api_key.get_secret_value().strip()
+        ):
+            raise ValueError("GEMINI_API_KEY is required when CATALOGUE_GENERATION_PROVIDER=gemini")
         return self
 
 
