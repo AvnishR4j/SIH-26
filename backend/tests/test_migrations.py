@@ -13,6 +13,10 @@ APPLICATION_TABLES = {
     "otp_idempotency",
     "catalog_drafts",
     "draft_create_idempotency",
+    "media_objects",
+    "image_upload_idempotency",
+    "operations",
+    "operation_idempotency",
 }
 
 

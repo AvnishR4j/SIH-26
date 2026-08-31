@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -40,6 +40,21 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/kalasetu"
     database_echo: bool = False
     database_auto_create: bool = False
+    media_storage: Literal["local"] = "local"
+    media_local_dir: Path = Path("./media")
+    media_url_base: str = "http://localhost:8000/media"
+    max_image_bytes: int = Field(default=10_485_760, ge=1)
+    max_image_pixels: int = Field(default=25_000_000, ge=1)
+    ai_operation_poll_after_seconds: int = Field(default=2, ge=1, le=60)
+    image_enhancement_provider: Literal["mock"] = "mock"
+
+    @field_validator("media_url_base")
+    @classmethod
+    def validate_media_url_base(cls, value: str) -> str:
+        normalized = value.rstrip("/")
+        if not normalized.startswith(("http://", "https://")):
+            raise ValueError("MEDIA_URL_BASE must be an absolute HTTP(S) URL")
+        return normalized
 
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
@@ -55,6 +70,8 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DATABASE_AUTO_CREATE must be false in production; run migrations instead"
             )
+        if self.environment == "production" and not self.media_url_base.startswith("https://"):
+            raise ValueError("MEDIA_URL_BASE must use HTTPS in production")
         return self
 
 

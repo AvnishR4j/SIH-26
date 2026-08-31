@@ -26,8 +26,8 @@ Open:
 
 ## Development authentication
 
-The backend implements the frozen OTP, profile, and catalogue draft contract
-with transactional PostgreSQL persistence. Request an OTP with an
+The backend implements the frozen OTP, profile, catalogue draft, and image
+workflow contract with transactional PostgreSQL persistence. Request an OTP with an
 `Idempotency-Key` header, then verify it with the development code `123456`.
 Users, profiles, consent, retry records, and drafts survive server restarts.
 OTPs are stored as keyed hashes and are consumed atomically.
@@ -43,12 +43,31 @@ Implemented routes:
 - `GET /api/v1/catalog/drafts`
 - `GET /api/v1/catalog/drafts/{draft_id}`
 - `PATCH /api/v1/catalog/drafts/{draft_id}`
+- `POST /api/v1/catalog/drafts/{draft_id}/images`
+- `POST /api/v1/catalog/drafts/{draft_id}/images/{image_id}/enhance`
+- `PATCH /api/v1/catalog/drafts/{draft_id}/images/{image_id}`
+- `GET /api/v1/operations/{operation_id}`
 
 Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
 latest `version`; stale writes return `409 VERSION_CONFLICT` so the frontend can
 refetch before retrying. The catalogue service owns persistence behind the HTTP
 routes, so later media, AI, and approval work does not change the Flutter-facing
 draft contract.
+
+## Development media workflow
+
+Image uploads accept decoded JPEG, PNG, or WebP files up to the configured byte
+and pixel limits. Original files are preserved, upload and enhancement starts
+are idempotent, and the first image is always the draft's primary image. The
+mock enhancement provider produces a deterministic square JPEG so frontend
+integration can exercise the complete asynchronous operation-polling flow.
+
+`MEDIA_STORAGE=local` writes files atomically beneath `MEDIA_LOCAL_DIR` and
+serves them from `MEDIA_URL_BASE`. This is a development adapter: its URLs are
+unguessable but not authenticated. Do not use it for private production draft
+media; production must use a private object store with short-lived signed URLs.
+The original is never replaced, and an enhanced image is used only after the
+artisan explicitly selects that variant.
 
 ## Database migrations
 

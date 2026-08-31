@@ -1,11 +1,31 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    Header,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 
-from app.api.dependencies import CatalogServiceDependency, CurrentUser
+from app.api.dependencies import CatalogServiceDependency, CurrentUser, MediaServiceDependency
 from app.core.errors import error_responses
-from app.schemas.catalog import Draft, DraftCreate, DraftList, DraftPatch, DraftStatus
+from app.schemas.catalog import (
+    Draft,
+    DraftCreate,
+    DraftImage,
+    DraftImagePatch,
+    DraftList,
+    DraftPatch,
+    DraftStatus,
+    ImageEnhancementRequest,
+)
+from app.schemas.operations import OperationResponse
 
 router = APIRouter(tags=["catalogue drafts"])
 
@@ -65,3 +85,72 @@ def update_draft(
     service: CatalogServiceDependency,
 ) -> Draft:
     return service.update_draft(user, draft_id, body)
+
+
+@router.post(
+    "/drafts/{draft_id}/images",
+    response_model=DraftImage,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 404, 409, 413, 415, 422, 500, 503),
+)
+async def upload_image(
+    draft_id: str,
+    user: CurrentUser,
+    service: MediaServiceDependency,
+    image: Annotated[UploadFile, File()],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+    is_primary: Annotated[bool, Form()] = True,
+) -> DraftImage:
+    content = await image.read(service.settings.max_image_bytes + 1)
+    await image.close()
+    return service.upload_image(
+        user,
+        draft_id,
+        content,
+        is_primary,
+        str(idempotency_key),
+    )
+
+
+@router.post(
+    "/drafts/{draft_id}/images/{image_id}/enhance",
+    response_model=OperationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500, 503),
+)
+def enhance_image(
+    draft_id: str,
+    image_id: str,
+    body: ImageEnhancementRequest,
+    user: CurrentUser,
+    service: MediaServiceDependency,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> OperationResponse:
+    operation, should_schedule = service.start_image_enhancement(
+        user,
+        draft_id,
+        image_id,
+        body,
+        str(idempotency_key),
+    )
+    response.headers["Location"] = f"/api/v1/operations/{operation.id}"
+    if should_schedule:
+        background_tasks.add_task(service.complete_image_enhancement, user.id, operation.id)
+    return operation
+
+
+@router.patch(
+    "/drafts/{draft_id}/images/{image_id}",
+    response_model=Draft,
+    responses=error_responses(400, 401, 404, 409, 422, 500),
+)
+def update_image(
+    draft_id: str,
+    image_id: str,
+    body: DraftImagePatch,
+    user: CurrentUser,
+    service: MediaServiceDependency,
+) -> Draft:
+    return service.update_image(user, draft_id, image_id, body)

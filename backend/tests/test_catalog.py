@@ -89,6 +89,31 @@ def test_create_draft_rejects_idempotency_key_reuse_with_different_body() -> Non
     assert response.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
 
 
+def test_create_draft_replay_returns_the_original_response_snapshot() -> None:
+    headers = login_headers()
+    key = str(uuid4())
+    original = create_draft(headers, key=key)
+    updated = client.patch(
+        f"/api/v1/catalog/drafts/{original['id']}",
+        headers=headers,
+        json={"version": 1, "fields": {"material": "cotton"}},
+    )
+    replay = client.post(
+        "/api/v1/catalog/drafts",
+        headers={**headers, "Idempotency-Key": key},
+        json={
+            "craft_category": "textile",
+            "source_language": "hi",
+            "initial_notes": "Hand embroidered cotton dupatta",
+        },
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+    assert replay.status_code == 201
+    assert replay.json() == original
+
+
 def test_create_draft_requires_auth_and_uuid_idempotency_key() -> None:
     missing_auth = client.post(
         "/api/v1/catalog/drafts",
