@@ -104,6 +104,9 @@ void main() {
       );
       expect(approved.status, 'approved');
 
+      final reopened = await api.getPublishedCatalogue(draft.id);
+      expect(reopened.publicShareId, approved.publicShareId);
+
       final share = await api.getShareCard(approved.publicShareId);
       expect(share.catalogId, approved.id);
       expect(share.enquiryEnabled, isTrue);

@@ -15,6 +15,8 @@ class CatalogueFlowController {
 
   CatalogueFlowState get state => _state!;
 
+  String? get localImagePath => _state?.localImagePath;
+
   Future<CatalogueFlowState> createDraft(String craftCategory) async {
     final key = _createDraftKey ??= newIdempotencyKey();
     final draft = await _apiClient.createDraft(
