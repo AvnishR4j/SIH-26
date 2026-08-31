@@ -32,6 +32,10 @@ persistence. Request an OTP with an `Idempotency-Key` header, then verify it
 with the development code `123456`. Users, profiles, consent, retry records,
 drafts, media metadata, transcripts, and pricing suggestions survive server
 restarts. OTPs are stored as keyed hashes and are consumed atomically.
+`DEV_OTP` is the only delivery mode in the prototype. If it is unset, OTP
+requests fail closed with `503 SERVICE_UNAVAILABLE`; the backend never creates
+an undeliverable random code. Choose and integrate an audited SMS provider
+before treating authentication as production-ready.
 
 Implemented routes:
 

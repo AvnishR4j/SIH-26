@@ -80,6 +80,12 @@ class AuthService:
             session.execute(delete(User))
 
     def request_otp(self, phone: str, idempotency_key: str) -> RequestOtpResponse:
+        if self.settings.dev_otp is None:
+            raise ApiError(
+                503,
+                "SERVICE_UNAVAILABLE",
+                "OTP delivery is temporarily unavailable.",
+            )
         now = datetime.now(UTC)
         with self._lock:
             try:
@@ -129,7 +135,7 @@ class AuthService:
                         session.add(OtpAttempt(phone=phone, created_at=now))
 
                     request_id = f"otp_req_{uuid4().hex[:12]}"
-                    otp = self.settings.dev_otp or (f"{int(uuid4().hex[:8], 16) % 1_000_000:06d}")
+                    otp = self.settings.dev_otp
                     session.add(
                         OtpRequest(
                             id=request_id,
