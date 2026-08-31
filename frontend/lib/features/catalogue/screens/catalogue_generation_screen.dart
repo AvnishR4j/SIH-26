@@ -125,7 +125,7 @@ class _CatalogueGenerationScreenState extends State<CatalogueGenerationScreen> {
 
   Future<void> _review() async {
     _pollTimer?.cancel();
-    await Navigator.of(context).pushReplacement(
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CatalogueReviewScreen(
           controller: widget.controller,

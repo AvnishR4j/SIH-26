@@ -106,7 +106,7 @@ class _CatalogueReviewScreenState extends State<CatalogueReviewScreen> {
         ),
       );
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ImageEnhancementScreen(
             controller: widget.controller,

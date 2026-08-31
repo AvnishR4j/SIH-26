@@ -106,7 +106,7 @@ class _VoiceDescriptionScreenState extends State<VoiceDescriptionScreen> {
         recording,
       );
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CatalogueGenerationScreen(
             controller: widget.controller,

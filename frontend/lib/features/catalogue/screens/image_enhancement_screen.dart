@@ -74,7 +74,7 @@ class _ImageEnhancementScreenState extends State<ImageEnhancementScreen> {
     try {
       await widget.controller.selectImageVariant(selected);
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => PricingAssistantScreen(
             controller: widget.controller,

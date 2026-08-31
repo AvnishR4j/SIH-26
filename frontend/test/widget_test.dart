@@ -122,6 +122,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('हिंदी में बताएं'), findsOneWidget);
     expect(find.byKey(const Key('voiceRecordButton')), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('फोटो देखें'), findsOneWidget);
+    expect(find.byKey(const Key('continueFromPhotoButton')), findsOneWidget);
   });
 }
 
