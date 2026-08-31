@@ -103,7 +103,15 @@ class MediaService:
                         created_at=now,
                     )
                     images.append(image)
-                    updated = draft.model_copy(update={"images": images, "updated_at": now})
+                    status = (
+                        "media_ready"
+                        if draft.status == "draft" and draft.voice_notes
+                        else draft.status
+                    )
+                    updated = draft.model_copy(
+                        update={"images": images, "status": status, "updated_at": now}
+                    )
+                    row.status = updated.status
                     row.payload = updated.model_dump(mode="json")
                     row.updated_at = now
                     session.add(

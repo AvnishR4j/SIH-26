@@ -45,8 +45,24 @@ class Settings(BaseSettings):
     media_url_base: str = "http://localhost:8000/media"
     max_image_bytes: int = Field(default=10_485_760, ge=1)
     max_image_pixels: int = Field(default=25_000_000, ge=1)
+    max_audio_bytes: int = Field(default=26_214_400, ge=1)
+    max_audio_duration_seconds: int = Field(default=120, ge=1, le=120)
     ai_operation_poll_after_seconds: int = Field(default=2, ge=1, le=60)
     image_enhancement_provider: Literal["mock"] = "mock"
+    speech_provider: Literal["faster_whisper"] = "faster_whisper"
+    whisper_model_size: str = "small"
+    whisper_device: Literal["cpu", "cuda"] = "cpu"
+    whisper_compute_type: str = "int8"
+    whisper_cpu_threads: int = Field(default=4, ge=1, le=64)
+    whisper_model_cache_dir: Path = Path("./models/faster-whisper")
+
+    @field_validator("whisper_model_size", "whisper_compute_type")
+    @classmethod
+    def reject_blank_whisper_setting(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Whisper model settings cannot be blank")
+        return cleaned
 
     @field_validator("media_url_base")
     @classmethod

@@ -192,6 +192,56 @@ class ImageUploadIdempotency(Base):
     )
 
 
+class VoiceMedia(Base):
+    __tablename__ = "voice_media"
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="size_positive"),
+        CheckConstraint("duration_seconds BETWEEN 1 AND 120", name="duration_allowed"),
+        CheckConstraint("language IN ('hi', 'en')", name="language_allowed"),
+        Index("ix_voice_media_draft_created", "draft_id", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    draft_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_drafts.id", ondelete="CASCADE"), nullable=False
+    )
+    audio_key: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    language: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class VoiceUploadIdempotency(Base):
+    __tablename__ = "voice_upload_idempotency"
+    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    voice_id: Mapped[str] = mapped_column(
+        ForeignKey("voice_media.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class Operation(Base):
     __tablename__ = "operations"
     __table_args__ = (

@@ -17,6 +17,8 @@ APPLICATION_TABLES = {
     "image_upload_idempotency",
     "operations",
     "operation_idempotency",
+    "voice_media",
+    "voice_upload_idempotency",
 }
 
 

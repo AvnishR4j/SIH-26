@@ -118,8 +118,23 @@ class VoiceNote(StrictModel):
     id: str
     language: Literal["hi", "en"]
     status: Literal["uploaded"]
-    duration_seconds: int
+    duration_seconds: int = Field(ge=1, le=120)
     created_at: datetime
+
+
+class GenerateListingRequest(StrictModel):
+    voice_note_id: str = Field(min_length=1, max_length=40)
+    image_id: str = Field(min_length=1, max_length=40)
+    target_languages: list[Literal["hi", "en"]] = Field(min_length=1, max_length=2)
+
+    @field_validator("target_languages")
+    @classmethod
+    def require_unique_target_languages(
+        cls, value: list[Literal["hi", "en"]]
+    ) -> list[Literal["hi", "en"]]:
+        if len(set(value)) != len(value):
+            raise ValueError("Target languages must be unique.")
+        return value
 
 
 class Transcript(StrictModel):

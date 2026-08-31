@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -13,7 +13,12 @@ from fastapi import (
     status,
 )
 
-from app.api.dependencies import CatalogServiceDependency, CurrentUser, MediaServiceDependency
+from app.api.dependencies import (
+    CatalogServiceDependency,
+    CurrentUser,
+    MediaServiceDependency,
+    VoiceServiceDependency,
+)
 from app.core.errors import error_responses
 from app.schemas.catalog import (
     Draft,
@@ -23,7 +28,9 @@ from app.schemas.catalog import (
     DraftList,
     DraftPatch,
     DraftStatus,
+    GenerateListingRequest,
     ImageEnhancementRequest,
+    VoiceNote,
 )
 from app.schemas.operations import OperationResponse
 
@@ -154,3 +161,59 @@ def update_image(
     service: MediaServiceDependency,
 ) -> Draft:
     return service.update_image(user, draft_id, image_id, body)
+
+
+@router.post(
+    "/drafts/{draft_id}/voice-notes",
+    response_model=VoiceNote,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(400, 401, 404, 409, 413, 415, 422, 500, 503),
+)
+async def upload_voice_note(
+    draft_id: str,
+    user: CurrentUser,
+    service: VoiceServiceDependency,
+    audio: Annotated[UploadFile, File()],
+    language: Annotated[Literal["hi", "en"], Form()],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> VoiceNote:
+    content = await audio.read(service.settings.max_audio_bytes + 1)
+    await audio.close()
+    return service.upload_voice_note(
+        user,
+        draft_id,
+        content,
+        language,
+        str(idempotency_key),
+    )
+
+
+@router.post(
+    "/drafts/{draft_id}/generate-listing",
+    response_model=OperationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses=error_responses(400, 401, 403, 404, 409, 422, 500, 503),
+)
+def generate_listing(
+    draft_id: str,
+    body: GenerateListingRequest,
+    user: CurrentUser,
+    service: VoiceServiceDependency,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+) -> OperationResponse:
+    operation, should_schedule = service.start_listing_generation(
+        user,
+        draft_id,
+        body,
+        str(idempotency_key),
+    )
+    response.headers["Location"] = f"/api/v1/operations/{operation.id}"
+    if should_schedule:
+        background_tasks.add_task(
+            service.complete_listing_generation,
+            user.id,
+            operation.id,
+        )
+    return operation
