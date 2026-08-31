@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from app.core.config import Settings
 from app.core.errors import ApiError
 from app.db.models import (
+    BuyerEnquiry,
     CatalogDraft,
     DraftCreateIdempotency,
     OtpIdempotency,
@@ -20,17 +21,21 @@ from app.db.models import (
 from app.db.session import Database, normalize_database_url
 from app.schemas.catalog import (
     DraftCreate,
+    DraftImagePatch,
     DraftPatch,
     GenerateListingRequest,
     ImageEnhancementRequest,
+    ListingUpdate,
     PricingSuggestionRequest,
     ProductFieldsUpdate,
 )
 from app.schemas.profile import ProfileUpdate
+from app.schemas.sharing import ApprovalRequest, EnquiryRequest
 from app.services.auth import AuthService
 from app.services.catalog import CatalogService
 from app.services.media import MediaService
 from app.services.pricing import PricingService
+from app.services.sharing import SharingService
 from app.services.speech import TranscriptionResult
 from app.services.voice import VoiceService
 from app.storage.local import LocalMediaStorage
@@ -359,4 +364,108 @@ def test_media_and_operations_survive_database_reinitialization(tmp_path: Path) 
     assert len(list(media_path.rglob("original.jpg"))) == 1
     assert len(list(media_path.rglob("original.wav"))) == 1
     assert len(list(media_path.rglob("enhanced.jpg"))) == 1
+    second_database.dispose()
+
+
+def test_approved_share_and_enquiry_survive_database_reinitialization(
+    tmp_path: Path,
+) -> None:
+    media_path = tmp_path / "share-media"
+    settings = database_settings(tmp_path / "share-restart.db", media_path)
+    storage = LocalMediaStorage(settings)
+    first_database = Database(settings)
+    auth = AuthService(settings, first_database)
+    catalog = CatalogService(settings, first_database)
+    media = MediaService(settings, first_database, storage)
+    pricing = PricingService(settings, first_database)
+    sharing = SharingService(settings, first_database, storage)
+    login, user = authenticated_user(auth)
+    draft = catalog.create_draft(
+        user,
+        DraftCreate(craft_category="textile", source_language="hi"),
+        str(uuid4()),
+    )
+    image = media.upload_image(user, draft.id, jpeg_bytes(), True, str(uuid4()))
+    detailed = catalog.update_draft(
+        user,
+        draft.id,
+        DraftPatch(
+            version=1,
+            fields=ProductFieldsUpdate(
+                product_type="dupatta",
+                material="cotton",
+                technique="hand embroidery",
+                dimensions="2.4 m x 1 m",
+                quantity_available=2,
+                production_time_days=7,
+            ),
+            listing=ListingUpdate(
+                title_hi="हाथ की कढ़ाई वाला दुपट्टा",
+                title_en="Hand Embroidered Dupatta",
+                description_hi="सूती कपड़े पर हाथ की कढ़ाई।",
+                description_en="Hand embroidery on cotton fabric.",
+            ),
+        ),
+    )
+    selected = media.update_image(
+        user,
+        draft.id,
+        image.id,
+        DraftImagePatch(version=detailed.version, selected_variant="original"),
+    )
+    suggestion = pricing.suggest_price(
+        user,
+        draft.id,
+        PricingSuggestionRequest(
+            version=selected.version,
+            material_cost_paise=30_000,
+            labour_hours=8,
+            hourly_rate_paise=5_000,
+            packaging_cost_paise=5_000,
+            logistics_buffer_paise=0,
+            benchmark_category="cotton_dupatta",
+        ),
+        str(uuid4()),
+    )
+    approved = sharing.approve_draft(
+        user,
+        draft.id,
+        ApprovalRequest(version=suggestion.draft_version, approved_price_paise=95_000),
+        str(uuid4()),
+    )
+    enquiry_key = str(uuid4())
+    enquiry_request = EnquiryRequest(
+        buyer_name="Aarav Retail",
+        buyer_phone="+918888888888",
+        message="Interested in 20 pieces",
+        quantity_requested=20,
+        consent_to_contact=True,
+    )
+    original_enquiry = sharing.submit_enquiry(
+        approved.public_share_id,
+        enquiry_request,
+        enquiry_key,
+    )
+    original_card = sharing.get_share_card(approved.public_share_id)
+    first_database.dispose()
+
+    second_database = Database(settings)
+    restored_auth = AuthService(settings, second_database)
+    restored_catalog = CatalogService(settings, second_database)
+    restored_sharing = SharingService(settings, second_database, LocalMediaStorage(settings))
+    restored_user = restored_auth.authenticate(login.access_token)
+    restored_draft = restored_catalog.get_draft(restored_user, draft.id)
+    restored_card = restored_sharing.get_share_card(approved.public_share_id)
+    replay = restored_sharing.submit_enquiry(
+        approved.public_share_id,
+        enquiry_request,
+        enquiry_key,
+    )
+
+    assert restored_draft.status == "approved"
+    assert restored_card == original_card
+    assert replay == original_enquiry
+    assert len(list(media_path.glob("public/*/product.jpg"))) == 1
+    with second_database.session() as session:
+        assert session.scalar(select(func.count(BuyerEnquiry.id))) == 1
     second_database.dispose()

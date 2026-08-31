@@ -13,8 +13,12 @@ from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
 from app.db.base import ensure_utc
 from app.db.models import (
+    ApprovalIdempotency,
+    BuyerEnquiry,
     CatalogDraft,
+    CatalogSnapshot,
     DraftCreateIdempotency,
+    EnquiryIdempotency,
     ImageUploadIdempotency,
     MediaObject,
     Operation,
@@ -45,6 +49,10 @@ class CatalogService:
 
     def reset(self) -> None:
         with self._lock, self.database.session() as session, session.begin():
+            session.execute(delete(EnquiryIdempotency))
+            session.execute(delete(BuyerEnquiry))
+            session.execute(delete(ApprovalIdempotency))
+            session.execute(delete(CatalogSnapshot))
             session.execute(delete(OperationIdempotency))
             session.execute(delete(Operation))
             session.execute(delete(VoiceUploadIdempotency))

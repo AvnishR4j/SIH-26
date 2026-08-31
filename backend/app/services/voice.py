@@ -182,6 +182,20 @@ class VoiceService:
 
                     row = self._owned_draft_row(session, user.id, draft_id, lock=True)
                     draft = Draft.model_validate(row.payload)
+                    concurrent_replay = self._operation_replay(
+                        session, user.id, "generate_listing", idempotency_key
+                    )
+                    if (
+                        concurrent_replay is not None
+                        and ensure_utc(concurrent_replay.expires_at) > now
+                    ):
+                        if concurrent_replay.request_payload != request_payload:
+                            raise self._idempotency_conflict()
+                        operation = session.get(Operation, concurrent_replay.operation_id)
+                        return (
+                            OperationResponse.model_validate(concurrent_replay.response_payload),
+                            operation is not None and operation.status == "queued",
+                        )
                     self._ensure_editable(draft)
                     self._require_voice_note(draft, request.voice_note_id)
                     self._require_image(draft, request.image_id)

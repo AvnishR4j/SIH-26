@@ -26,17 +26,15 @@ def settings(**overrides: object) -> Settings:
 
 def test_openapi_documents_runtime_error_envelope() -> None:
     specification = app.openapi()
-    operations = [
-        specification["paths"]["/api/v1/auth/request-otp"]["post"],
-        specification["paths"]["/api/v1/auth/verify-otp"]["post"],
-        specification["paths"]["/api/v1/me"]["patch"],
-        specification["paths"]["/api/v1/catalog/drafts"]["post"],
-        specification["paths"]["/api/v1/catalog/drafts/{draft_id}"]["patch"],
-    ]
-
-    for operation in operations:
-        validation_schema = operation["responses"]["422"]["content"]["application/json"]["schema"]
-        assert validation_schema == {"$ref": "#/components/schemas/ErrorResponse"}
+    for path_item in specification["paths"].values():
+        for method, operation in path_item.items():
+            if method not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            for status_code, response in operation["responses"].items():
+                if int(status_code) < 400:
+                    continue
+                schema = response["content"]["application/json"]["schema"]
+                assert schema == {"$ref": "#/components/schemas/ErrorResponse"}
 
 
 def test_openapi_marks_canonical_nested_response_keys_required() -> None:
@@ -67,6 +65,25 @@ def test_production_rejects_development_otp_and_short_jwt_secret() -> None:
         settings(environment="production", jwt_secret="x" * 32, dev_otp="123456")
     with pytest.raises(ValidationError, match="at least 32 characters"):
         settings(environment="production", jwt_secret="too-short", dev_otp=None)
+
+
+def test_production_rejects_local_media_and_insecure_public_origins() -> None:
+    secure = {
+        "environment": "production",
+        "jwt_secret": "x" * 32,
+        "dev_otp": None,
+        "database_auto_create": False,
+        "media_url_base": "https://media.example.test",
+        "public_api_base_url": "https://api.example.test",
+        "public_share_web_base_url": "https://share.example.test",
+        "cors_origins": ["https://app.example.test"],
+    }
+    with pytest.raises(ValidationError, match="MEDIA_STORAGE=local"):
+        settings(**secure)
+    with pytest.raises(ValidationError, match="PUBLIC_API_BASE_URL"):
+        settings(**{**secure, "public_api_base_url": "http://api.example.test"})
+    with pytest.raises(ValidationError, match="CORS_ORIGINS"):
+        settings(**{**secure, "cors_origins": ["http://app.example.test"]})
 
 
 def test_expired_access_token_is_rejected() -> None:

@@ -279,6 +279,103 @@ class PricingSuggestionIdempotency(Base):
     )
 
 
+class CatalogSnapshot(Base):
+    __tablename__ = "catalog_snapshots"
+    __table_args__ = (
+        CheckConstraint("approved_price_paise > 0", name="approved_price_positive"),
+        CheckConstraint("source_draft_version >= 1", name="source_draft_version_positive"),
+        UniqueConstraint("draft_id"),
+        Index("ix_catalog_snapshots_owner_created", "owner_id", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    draft_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_drafts.id", ondelete="RESTRICT"), nullable=False
+    )
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    public_share_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    public_image_key: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
+    source_draft_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved_price_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    price_override_reason: Mapped[str | None] = mapped_column(String(500))
+    approval_note: Mapped[str | None] = mapped_column(String(1000))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ApprovalIdempotency(Base):
+    __tablename__ = "approval_idempotency"
+    __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_snapshots.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class BuyerEnquiry(Base):
+    __tablename__ = "buyer_enquiries"
+    __table_args__ = (
+        CheckConstraint(
+            "quantity_requested IS NULL OR quantity_requested >= 1", name="quantity_allowed"
+        ),
+        CheckConstraint("consent_to_contact = true", name="contact_consent_required"),
+        Index(
+            "ix_buyer_enquiries_catalog_phone_created",
+            "catalog_id",
+            "buyer_phone",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_snapshots.id", ondelete="RESTRICT"), nullable=False
+    )
+    buyer_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    buyer_phone: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str | None] = mapped_column(String(1000))
+    quantity_requested: Mapped[int | None] = mapped_column(Integer)
+    consent_to_contact: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class EnquiryIdempotency(Base):
+    __tablename__ = "enquiry_idempotency"
+    __table_args__ = (UniqueConstraint("public_share_id", "idempotency_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    public_share_id: Mapped[str] = mapped_column(
+        ForeignKey("catalog_snapshots.public_share_id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    response_payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    enquiry_id: Mapped[str] = mapped_column(
+        ForeignKey("buyer_enquiries.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class Operation(Base):
     __tablename__ = "operations"
     __table_args__ = (

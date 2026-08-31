@@ -184,6 +184,20 @@ class MediaService:
 
                     row = self._owned_draft_row(session, user.id, draft_id, lock=True)
                     draft = Draft.model_validate(row.payload)
+                    concurrent_replay = self._operation_replay(
+                        session, user.id, "enhance_image", idempotency_key
+                    )
+                    if (
+                        concurrent_replay is not None
+                        and ensure_utc(concurrent_replay.expires_at) > now
+                    ):
+                        if concurrent_replay.request_payload != request_payload:
+                            raise self._idempotency_conflict()
+                        response = OperationResponse.model_validate(
+                            concurrent_replay.response_payload
+                        )
+                        operation = session.get(Operation, concurrent_replay.operation_id)
+                        return response, (operation is not None and operation.status == "queued")
                     self._ensure_editable(draft)
                     image = self._find_image(draft, image_id)
                     if image.enhancement_status in {"queued", "running"}:
