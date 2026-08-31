@@ -75,26 +75,23 @@ class PricingService:
                     if request.version != draft.version:
                         raise self._version_conflict(draft.version)
                     benchmark = session.get(PricingBenchmark, request.benchmark_category)
+                    fallback_category = None
                     if benchmark is None:
-                        categories = list(
-                            session.scalars(
-                                select(PricingBenchmark.category).order_by(
-                                    PricingBenchmark.category
-                                )
+                        fallback_category = request.benchmark_category
+                        benchmark = session.get(PricingBenchmark, "generic_handicraft")
+                        if benchmark is None:
+                            raise ApiError(
+                                503,
+                                "CONFIGURATION_ERROR",
+                                "The generic pricing benchmark is unavailable.",
                             )
-                        )
-                        raise ApiError(
-                            422,
-                            "VALIDATION_ERROR",
-                            "The benchmark category is not available.",
-                            {"available_categories": categories},
-                        )
 
                     suggestion = self._calculate(
                         draft_id,
                         draft.version + 1,
                         request,
                         benchmark,
+                        fallback_category=fallback_category,
                     )
                     updated = draft.model_copy(
                         update={
@@ -136,6 +133,8 @@ class PricingService:
         draft_version: int,
         request: PricingSuggestionRequest,
         benchmark: PricingBenchmark,
+        *,
+        fallback_category: str | None = None,
     ) -> PricingSuggestion:
         labour_cost = int(
             (Decimal(str(request.labour_hours)) * Decimal(request.hourly_rate_paise)).quantize(
@@ -193,6 +192,10 @@ class PricingService:
         if benchmark.is_demo_data:
             reasons.append(
                 "The market comparison uses demo benchmark data and must be reviewed before sale."
+            )
+        if fallback_category is not None:
+            reasons.append(
+                f"No exact benchmark exists for '{fallback_category}', so a generic handicraft reference band was used."
             )
         if confidence == "low":
             reasons.append(
