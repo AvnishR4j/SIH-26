@@ -1,0 +1,386 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/localization/app_language.dart';
+import '../../../core/localization/app_strings.dart';
+import '../../../core/media/media_capture_service.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/brand_mark.dart';
+import '../../../shared/widgets/language_switch.dart';
+import '../../auth/models/auth_models.dart';
+import '../../catalogue/controllers/catalogue_flow_controller.dart';
+import '../../catalogue/models/catalogue_models.dart';
+import '../../catalogue/screens/product_photo_screen.dart';
+import '../../profile/models/profile_models.dart';
+import '../../profile/screens/profile_consent_screen.dart';
+import '../controllers/home_controller.dart';
+
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({
+    super.key,
+    required this.apiClient,
+    required this.session,
+    required this.profile,
+    required this.language,
+    required this.onLanguageChanged,
+    this.mediaCaptureService,
+  });
+
+  final ApiClient apiClient;
+  final AuthSession session;
+  final ArtisanProfile profile;
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onLanguageChanged;
+  final MediaCaptureService? mediaCaptureService;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late AppLanguage _language;
+  late ArtisanProfile _profile;
+  late final HomeController _controller;
+  List<DraftSummary> _drafts = const [];
+  bool _loadingDrafts = true;
+  bool _creating = false;
+  CatalogueFlowController? _pendingFlow;
+
+  @override
+  void initState() {
+    super.initState();
+    _language = widget.language;
+    _profile = widget.profile;
+    _controller = HomeController(
+      widget.apiClient,
+      media: widget.mediaCaptureService ?? PlatformMediaCaptureService(),
+    );
+    _loadDrafts();
+  }
+
+  Future<void> _loadDrafts() async {
+    try {
+      final drafts = await _controller.loadRecentDrafts();
+      if (mounted) setState(() => _drafts = drafts);
+    } catch (_) {
+      // Home remains usable even when the optional recent list cannot load.
+    } finally {
+      if (mounted) setState(() => _loadingDrafts = false);
+    }
+  }
+
+  Future<String?> _chooseCategory() async {
+    final strings = AppStrings(_language);
+    final categories = _profile.craftCategories;
+    if (categories.isEmpty) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ProfileConsentScreen(
+            apiClient: widget.apiClient,
+            profile: _profile,
+            language: _language,
+            allowBack: true,
+            onComplete: (profile) {
+              setState(() => _profile = profile);
+              Navigator.of(context).pop();
+            },
+          ),
+        ),
+      );
+      return null;
+    }
+    if (categories.length == 1) return categories.first;
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                strings.categoryQuestion,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              for (final category in categories)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(strings.categoryLabel(category)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).pop(category),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startCatalogue() async {
+    if (_creating) return;
+    final category = await _chooseCategory();
+    if (category == null || !mounted) return;
+    setState(() => _creating = true);
+    final flow = _pendingFlow ??= _controller.newCatalogueFlow();
+    try {
+      await flow.createDraft(category);
+      if (!mounted) return;
+      _pendingFlow = null;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              ProductPhotoScreen(controller: flow, language: _language),
+        ),
+      );
+      await _loadDrafts();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProfileConsentScreen(
+          apiClient: widget.apiClient,
+          profile: _profile,
+          language: _language,
+          allowBack: true,
+          onComplete: (profile) {
+            setState(() => _profile = profile);
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings(_language);
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 20,
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BrandMark(compact: true),
+            SizedBox(width: 10),
+            Text(
+              'KalaSetu AI',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+            ),
+          ],
+        ),
+        actions: [
+          LanguageSwitch(
+            language: _language,
+            onChanged: (language) {
+              setState(() => _language = language);
+              widget.onLanguageChanged(language);
+            },
+          ),
+          const SizedBox(width: 10),
+          InkWell(
+            key: const Key('profileAvatar'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: _openProfile,
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.accent,
+              child: Text(
+                _profile.name.isEmpty ? 'K' : _profile.name.characters.first,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+        ],
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _loadDrafts,
+          color: AppColors.accent,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            children: [
+              Text(
+                strings.greeting(_profile.name),
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 26),
+                decoration: const BoxDecoration(
+                  border: Border.symmetric(
+                    horizontal: BorderSide(color: AppColors.divider),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.addProduct,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      strings.photoAndVoice,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 22),
+                    FilledButton(
+                      key: const Key('createCatalogueButton'),
+                      onPressed: _creating ? null : _startCatalogue,
+                      child: _creating
+                          ? const SizedBox.square(
+                              dimension: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Row(
+                              children: [
+                                const Icon(Icons.add_a_photo_outlined),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(strings.createCatalogue),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        strings.catalogueVoiceCue,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.mic_none_rounded),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                strings.recentDrafts,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              if (_loadingDrafts)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
+                )
+              else if (_drafts.isEmpty) ...[
+                const SizedBox(height: 10),
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 42,
+                  color: AppColors.border,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  strings.noDrafts,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  strings.firstCatalogue,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ] else
+                for (final draft in _drafts)
+                  _DraftRow(
+                    title: _language == AppLanguage.hindi
+                        ? (draft.titleHi ??
+                              draft.titleEn ??
+                              strings.newCatalogue)
+                        : (draft.titleEn ??
+                              draft.titleHi ??
+                              strings.newCatalogue),
+                    statusLabel: strings.draftStatus(draft.status),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DraftRow extends StatelessWidget {
+  const _DraftRow({required this.title, required this.statusLabel});
+
+  final String title;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.image_outlined, color: AppColors.mutedText),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  statusLabel,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
