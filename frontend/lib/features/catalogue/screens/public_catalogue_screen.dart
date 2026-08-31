@@ -185,7 +185,7 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
                 aspectRatio: 1,
                 child: ProductImage(
                   networkUrl: card.imageUrl,
-                  localPath: widget.controller.state.localImagePath,
+                  localPath: widget.controller.localImagePath,
                   preferNetwork: true,
                 ),
               ),
