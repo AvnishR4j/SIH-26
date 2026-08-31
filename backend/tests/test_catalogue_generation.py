@@ -18,6 +18,7 @@ from app.services.catalogue_generation import (
     GroundedInteger,
     GroundedText,
     MockCatalogueGenerator,
+    _gemini_response_schema,
 )
 
 
@@ -101,6 +102,19 @@ def generated_response() -> GeminiCatalogueResponse:
             source_evidence=["कॉटन का दुपट्टा", "मात्रा 3"],
         ),
     )
+
+
+def test_gemini_response_schema_excludes_unsupported_additional_properties() -> None:
+    def contains_additional_properties(value: object) -> bool:
+        if isinstance(value, dict):
+            return "additionalProperties" in value or any(
+                contains_additional_properties(child) for child in value.values()
+            )
+        if isinstance(value, list):
+            return any(contains_additional_properties(child) for child in value)
+        return False
+
+    assert not contains_additional_properties(_gemini_response_schema())
 
 
 def test_mock_generator_remains_deterministic_default() -> None:

@@ -105,6 +105,23 @@ class GeminiCatalogueResponse(BaseModel):
     listing: GeneratedListing
 
 
+def _gemini_response_schema() -> dict[str, Any]:
+    """Return Gemini-compatible JSON schema while retaining strict local validation."""
+    schema = GeminiCatalogueResponse.model_json_schema()
+
+    def strip_unsupported_keywords(value: Any) -> None:
+        if isinstance(value, dict):
+            value.pop("additionalProperties", None)
+            for child in value.values():
+                strip_unsupported_keywords(child)
+        elif isinstance(value, list):
+            for child in value:
+                strip_unsupported_keywords(child)
+
+    strip_unsupported_keywords(schema)
+    return schema
+
+
 class MockCatalogueGenerator:
     def generate(
         self,
@@ -187,7 +204,7 @@ class GeminiCatalogueGenerator:
                 config=types.GenerateContentConfig(
                     system_instruction=self._system_instruction(),
                     response_mime_type="application/json",
-                    response_schema=GeminiCatalogueResponse,
+                    response_schema=_gemini_response_schema(),
                     max_output_tokens=2500,
                 ),
             )
