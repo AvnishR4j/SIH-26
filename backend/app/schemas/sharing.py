@@ -51,6 +51,23 @@ class PublicShareCard(StrictModel):
     published_at: datetime
 
 
+class MarketplaceCatalogue(StrictModel):
+    public_share_id: str
+    title: str
+    description: str
+    image_url: str
+    price_paise: int = Field(gt=0)
+    currency: Literal["INR"]
+    quantity_available: int = Field(ge=1)
+    artisan: PublicArtisan
+    published_at: datetime
+
+
+class MarketplaceCataloguePage(StrictModel):
+    items: list[MarketplaceCatalogue]
+    next_cursor: str | None
+
+
 class EnquiryRequest(StrictModel):
     buyer_name: str = Field(min_length=1, max_length=120)
     buyer_phone: str

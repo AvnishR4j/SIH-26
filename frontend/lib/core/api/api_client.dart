@@ -85,6 +85,11 @@ abstract interface class ApiClient {
 
   Future<ApprovedCatalogue> getPublishedCatalogue(String draftId);
 
+  Future<MarketplacePage> listMarketplaceCatalogues({
+    int limit = 20,
+    String? cursor,
+  });
+
   Future<ShareCard> getShareCard(String publicShareId);
 
   Future<BuyerEnquiry> submitEnquiry(

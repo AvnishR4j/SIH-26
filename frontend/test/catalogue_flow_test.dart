@@ -111,6 +111,11 @@ void main() {
       expect(share.catalogId, approved.id);
       expect(share.enquiryEnabled, isTrue);
 
+      final marketplace = await api.listMarketplaceCatalogues();
+      expect(marketplace.items, hasLength(1));
+      expect(marketplace.items.single.publicShareId, approved.publicShareId);
+      expect(marketplace.items.single.artisan.displayName, 'Sita Devi');
+
       const enquiryInput = BuyerEnquiryInput(
         buyerName: 'Aarav Retail',
         buyerPhone: '+918888888888',

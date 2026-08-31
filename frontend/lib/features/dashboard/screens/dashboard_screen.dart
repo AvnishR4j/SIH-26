@@ -12,6 +12,7 @@ import '../../catalogue/controllers/catalogue_flow_controller.dart';
 import '../../catalogue/models/catalogue_models.dart';
 import '../../catalogue/screens/public_catalogue_screen.dart';
 import '../../catalogue/screens/product_photo_screen.dart';
+import '../../marketplace/screens/explore_screen.dart';
 import '../../profile/models/profile_models.dart';
 import '../../profile/screens/profile_consent_screen.dart';
 import '../controllers/home_controller.dart';
@@ -61,6 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loadingDrafts = true;
   bool _draftLoadFailed = false;
   bool _creating = false;
+  int _selectedTab = 0;
   String? _openingDraftId;
   CatalogueFlowController? _pendingFlow;
 
@@ -280,161 +282,188 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 20),
         ],
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadDrafts,
-          color: AppColors.accent,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            children: [
-              Text(
-                strings.greeting(_profile.name),
-                style: const TextStyle(
-                  color: AppColors.darkAccent,
-                  fontFamily: 'serif',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 26),
-                decoration: const BoxDecoration(
-                  border: Border.symmetric(
-                    horizontal: BorderSide(color: AppColors.divider),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: _selectedTab == 0
+          ? SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _loadDrafts,
+                color: AppColors.accent,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   children: [
                     Text(
-                      strings.addProduct,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      strings.greeting(_profile.name),
+                      style: const TextStyle(
+                        color: AppColors.darkAccent,
+                        fontFamily: 'serif',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      strings.photoAndVoice,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 22),
-                    FilledButton(
-                      key: const Key('createCatalogueButton'),
-                      onPressed: _creating ? null : _startCatalogue,
-                      child: _creating
-                          ? const SizedBox.square(
-                              dimension: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Row(
-                              children: [
-                                const Icon(Icons.add_a_photo_outlined),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 26),
+                      decoration: const BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(color: AppColors.divider),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.addProduct,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            strings.photoAndVoice,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 22),
+                          FilledButton(
+                            key: const Key('createCatalogueButton'),
+                            onPressed: _creating ? null : _startCatalogue,
+                            child: _creating
+                                ? const SizedBox.square(
+                                    dimension: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Row(
                                     children: [
-                                      Text(strings.createCatalogue),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        strings.catalogueVoiceCue,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
+                                      const Icon(Icons.add_a_photo_outlined),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(strings.createCatalogue),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              strings.catalogueVoiceCue,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                      const Icon(Icons.mic_none_rounded),
                                     ],
                                   ),
-                                ),
-                                const Icon(Icons.mic_none_rounded),
-                              ],
-                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 28),
+                    Text(
+                      strings.recentDrafts,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    if (_loadingDrafts)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      )
+                    else if (_draftLoadFailed) ...[
+                      const Icon(
+                        Icons.cloud_off_outlined,
+                        size: 42,
+                        color: AppColors.mutedText,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        strings.draftLoadFailed,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.text,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: OutlinedButton.icon(
+                          onPressed: _loadDrafts,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(strings.tryAgain),
+                        ),
+                      ),
+                    ] else if (_drafts.isEmpty) ...[
+                      const SizedBox(height: 10),
+                      const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 42,
+                        color: AppColors.border,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        strings.noDrafts,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        strings.firstCatalogue,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ] else
+                      for (final draft in _drafts)
+                        _DraftRow(
+                          title: _language == AppLanguage.hindi
+                              ? (draft.titleHi ??
+                                    draft.titleEn ??
+                                    strings.newCatalogue)
+                              : (draft.titleEn ??
+                                    draft.titleHi ??
+                                    strings.newCatalogue),
+                          statusLabel: strings.draftStatus(draft.status),
+                          isOpening: _openingDraftId == draft.id,
+                          onTap: draft.status == 'approved'
+                              ? () => _openPublishedCatalogue(draft)
+                              : null,
+                        ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-              Text(
-                strings.recentDrafts,
-                style: Theme.of(context).textTheme.titleLarge,
+            )
+          : SafeArea(
+              child: ExploreScreen(
+                apiClient: widget.apiClient,
+                language: _language,
+                newCatalogueFlow: _controller.newCatalogueFlow,
               ),
-              const SizedBox(height: 16),
-              if (_loadingDrafts)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(color: AppColors.accent),
-                  ),
-                )
-              else if (_draftLoadFailed) ...[
-                const Icon(
-                  Icons.cloud_off_outlined,
-                  size: 42,
-                  color: AppColors.mutedText,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  strings.draftLoadFailed,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: OutlinedButton.icon(
-                    onPressed: _loadDrafts,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(strings.tryAgain),
-                  ),
-                ),
-              ] else if (_drafts.isEmpty) ...[
-                const SizedBox(height: 10),
-                const Icon(
-                  Icons.inventory_2_outlined,
-                  size: 42,
-                  color: AppColors.border,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  strings.noDrafts,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  strings.firstCatalogue,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ] else
-                for (final draft in _drafts)
-                  _DraftRow(
-                    title: _language == AppLanguage.hindi
-                        ? (draft.titleHi ??
-                              draft.titleEn ??
-                              strings.newCatalogue)
-                        : (draft.titleEn ??
-                              draft.titleHi ??
-                              strings.newCatalogue),
-                    statusLabel: strings.draftStatus(draft.status),
-                    isOpening: _openingDraftId == draft.id,
-                    onTap: draft.status == 'approved'
-                        ? () => _openPublishedCatalogue(draft)
-                        : null,
-                  ),
-            ],
+            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) => setState(() => _selectedTab = index),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: _language == AppLanguage.hindi ? 'होम' : 'Home',
           ),
-        ),
+          NavigationDestination(
+            key: const Key('exploreTab'),
+            icon: const Icon(Icons.storefront_outlined),
+            selectedIcon: const Icon(Icons.storefront),
+            label: _language == AppLanguage.hindi ? 'खोजें' : 'Explore',
+          ),
+        ],
       ),
     );
   }

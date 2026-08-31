@@ -490,6 +490,42 @@ def test_unknown_public_share_is_not_found() -> None:
     assert read.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_marketplace_lists_only_safe_approved_catalogues_with_pagination() -> None:
+    first_headers = login_headers("+919999999991")
+    first_draft = prepare_ready_draft(first_headers)
+    first = approve(first_headers, first_draft["id"])
+    assert first.status_code == 201
+
+    second_headers = login_headers("+919999999992")
+    second_draft = prepare_ready_draft(second_headers)
+    second = approve(second_headers, second_draft["id"])
+    assert second.status_code == 201
+
+    first_page = client.get("/api/v1/marketplace/catalogues", params={"limit": 1})
+    assert first_page.status_code == 200
+    first_item = first_page.json()["items"][0]
+    cursor = first_page.json()["next_cursor"]
+    assert cursor is not None
+    assert first_item["public_share_id"] in {
+        first.json()["public_share_id"],
+        second.json()["public_share_id"],
+    }
+    assert first_item["artisan"]["display_name"] == "Sita Devi"
+    serialized = str(first_item).lower()
+    for forbidden in ("+919", "draft_", "voice_", "material_cost", "owner_id"):
+        assert forbidden not in serialized
+
+    second_page = client.get(
+        "/api/v1/marketplace/catalogues", params={"limit": 1, "cursor": cursor}
+    )
+    assert second_page.status_code == 200
+    assert second_page.json()["items"][0]["public_share_id"] != first_item["public_share_id"]
+    assert second_page.json()["next_cursor"] is None
+
+    invalid = client.get("/api/v1/marketplace/catalogues", params={"cursor": "bad"})
+    assert invalid.status_code == 422
+
+
 def test_openapi_documents_approval_share_and_enquiry_contracts() -> None:
     paths = app.openapi()["paths"]
     approval = paths["/api/v1/catalog/drafts/{draft_id}/approve"]["post"]
