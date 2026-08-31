@@ -147,9 +147,19 @@ class CatalogueFlowController {
   Future<CatalogueDraft> waitForEnhancement() async {
     final operationId = state.enhancementOperationId;
     if (operationId == null) return refreshDraft();
+    final deadline = DateTime.now().add(const Duration(seconds: 60));
     var operation = await _apiClient.getOperation(operationId);
-    while (operation.isPending) {
+    while (operation.isPending && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(
+        Duration(seconds: operation.pollAfterSeconds.clamp(1, 10)),
+      );
       operation = await _apiClient.getOperation(operationId);
+    }
+    if (operation.isPending) {
+      throw const ApiException(
+        code: 'OPERATION_PENDING',
+        message: 'Image enhancement is still running. You can check again shortly.',
+      );
     }
     return refreshDraft();
   }
