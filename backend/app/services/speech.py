@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from threading import Lock
 from typing import Any, Literal, Protocol
+from unicodedata import normalize
 
 from app.core.config import REPOSITORY_ROOT, Settings, get_settings
 from app.core.errors import ApiError
@@ -33,11 +34,21 @@ class FasterWhisperTranscriber:
             segments, _ = model.transcribe(
                 BytesIO(content),
                 language=language,
-                beam_size=5,
+                task="transcribe",
+                beam_size=self.settings.whisper_beam_size,
+                best_of=self.settings.whisper_beam_size,
+                temperature=0.0,
                 vad_filter=True,
+                vad_parameters={
+                    "min_silence_duration_ms": self.settings.whisper_vad_min_silence_ms,
+                },
                 condition_on_previous_text=False,
+                initial_prompt=self._initial_prompt(language),
             )
-            text = " ".join(segment.text.strip() for segment in segments).strip()
+            text = normalize(
+                "NFC",
+                " ".join(segment.text.strip() for segment in segments).strip(),
+            )
         except Exception as error:
             raise ApiError(
                 503,
@@ -51,6 +62,18 @@ class FasterWhisperTranscriber:
                 "No clear speech was detected in the voice note.",
             )
         return TranscriptionResult(text=text, language=language)
+
+    @staticmethod
+    def _initial_prompt(language: Literal["hi", "en"]) -> str:
+        if language == "hi":
+            return (
+                "यह हिन्दी में भारतीय हस्तशिल्प उत्पाद का स्पष्ट विवरण है। "
+                "सामग्री, कारीगरी, रंग, आकार, मात्रा और बनने का समय ठीक से लिखें।"
+            )
+        return (
+            "This is a clear description of an Indian handmade craft product. "
+            "Transcribe material, technique, colour, size, quantity, and production time accurately."
+        )
 
     def _get_model(self) -> Any:
         if self._model is not None:
