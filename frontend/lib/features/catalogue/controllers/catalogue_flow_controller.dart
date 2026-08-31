@@ -158,7 +158,8 @@ class CatalogueFlowController {
     if (operation.isPending) {
       throw const ApiException(
         code: 'OPERATION_PENDING',
-        message: 'Image enhancement is still running. You can check again shortly.',
+        message:
+            'Image enhancement is still running. You can check again shortly.',
       );
     }
     return refreshDraft();

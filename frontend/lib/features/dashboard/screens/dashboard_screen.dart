@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/language_switch.dart';
 import '../../auth/models/auth_models.dart';
-import '../../auth/screens/login_screen.dart';
 import '../../catalogue/controllers/catalogue_flow_controller.dart';
 import '../../catalogue/models/catalogue_models.dart';
 import '../../catalogue/screens/product_photo_screen.dart';
@@ -24,6 +23,7 @@ class DashboardScreen extends StatefulWidget {
     required this.profile,
     required this.language,
     required this.onLanguageChanged,
+    required this.onLogout,
     this.mediaCaptureService,
   });
 
@@ -32,6 +32,7 @@ class DashboardScreen extends StatefulWidget {
   final ArtisanProfile profile;
   final AppLanguage language;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final VoidCallback onLogout;
   final MediaCaptureService? mediaCaptureService;
 
   @override
@@ -202,16 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => LoginScreen(
-          apiClient: widget.apiClient,
-          language: _language,
-          onLanguageChanged: widget.onLanguageChanged,
-        ),
-      ),
-      (_) => false,
-    );
+    widget.onLogout();
   }
 
   @override

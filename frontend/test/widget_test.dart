@@ -11,12 +11,18 @@ import 'package:kalasetu/core/media/media_capture_service.dart';
 import 'package:kalasetu/features/auth/models/auth_models.dart';
 import 'package:kalasetu/features/catalogue/models/catalogue_models.dart';
 import 'package:kalasetu/features/dashboard/screens/dashboard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('switches the login copy between Hindi and English', (
     tester,
   ) async {
     await tester.pumpWidget(const KalaSetuApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('अपने फोन नंबर से जुड़ें'), findsOneWidget);
     await tester.tap(find.text('English'));
@@ -27,7 +33,9 @@ void main() {
   });
 
   testWidgets('completes mock login and reaches dashboard', (tester) async {
-    await tester.pumpWidget(const KalaSetuApp());
+    final api = MockApiClient();
+    await tester.pumpWidget(KalaSetuApp(apiClient: api));
+    await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('phoneField')), '9876543210');
     await tester.tap(find.byKey(const Key('sendOtpButton')));
@@ -44,6 +52,14 @@ void main() {
     await tester.tap(find.text('English'));
     await tester.pump();
     expect(find.text('Add a new product'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpWidget(KalaSetuApp(apiClient: api));
+    await tester.pumpAndSettle();
+
+    expect(find.text('नया उत्पाद जोड़ें'), findsOneWidget);
+    expect(find.byKey(const Key('phoneField')), findsNothing);
   });
 
   testWidgets('starts the photo-before-voice catalogue flow', (tester) async {
@@ -79,6 +95,7 @@ void main() {
           profile: profile,
           language: AppLanguage.hindi,
           onLanguageChanged: (_) {},
+          onLogout: () {},
           mediaCaptureService: _FakeMediaCaptureService(imageFile.path),
         ),
       ),

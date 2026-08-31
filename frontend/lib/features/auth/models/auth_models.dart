@@ -59,6 +59,14 @@ class ArtisanUser {
       preferredLanguage: json['preferred_language']! as String,
     );
   }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'role': role,
+    'preferred_language': preferredLanguage,
+  };
 }
 
 class AuthSession {
@@ -82,4 +90,11 @@ class AuthSession {
       user: ArtisanUser.fromJson(json['user']! as Map<String, Object?>),
     );
   }
+
+  Map<String, Object?> toJson() => {
+    'access_token': accessToken,
+    'token_type': tokenType,
+    'expires_in_seconds': expiresInSeconds,
+    'user': user.toJson(),
+  };
 }

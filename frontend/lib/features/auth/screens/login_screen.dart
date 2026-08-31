@@ -17,11 +17,13 @@ class LoginScreen extends StatefulWidget {
     required this.apiClient,
     required this.language,
     required this.onLanguageChanged,
+    required this.onAuthenticated,
   });
 
   final ApiClient apiClient;
   final AppLanguage language;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final Future<void> Function(AuthSession session) onAuthenticated;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -68,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
             otpRequest: response,
             language: widget.language,
             onLanguageChanged: widget.onLanguageChanged,
+            onAuthenticated: widget.onAuthenticated,
           ),
         ),
       );
