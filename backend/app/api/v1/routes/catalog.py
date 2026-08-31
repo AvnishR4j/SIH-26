@@ -85,6 +85,19 @@ def get_draft(
     return service.get_draft(user, draft_id)
 
 
+@router.get(
+    "/drafts/{draft_id}/published",
+    response_model=ApprovedCatalog,
+    responses=error_responses(401, 404, 422, 500),
+)
+def get_published_catalogue(
+    draft_id: str,
+    user: CurrentUser,
+    service: SharingServiceDependency,
+) -> ApprovedCatalog:
+    return service.get_approved_catalog(user, draft_id)
+
+
 @router.patch(
     "/drafts/{draft_id}",
     response_model=Draft,

@@ -544,6 +544,21 @@ class RealApiClient implements ApiClient {
   }
 
   @override
+  Future<ApprovedCatalogue> getPublishedCatalogue(String id) async {
+    final v = await _request('GET', 'catalog/drafts/$id/published');
+    return ApprovedCatalogue(
+      id: v['id'] as String,
+      draftId: v['draft_id'] as String,
+      status: v['status'] as String,
+      approvedPricePaise: _i(v['approved_price_paise']),
+      currency: v['currency'] as String,
+      publicShareId: v['public_share_id'] as String,
+      publicShareUrl: v['public_share_url'] as String,
+      createdAt: _d(v['created_at']),
+    );
+  }
+
+  @override
   Future<ShareCard> getShareCard(String id) async {
     final v = await _request('GET', 'share/$id', auth: false);
     final a = (v['artisan'] as Map).cast<String, dynamic>();

@@ -180,6 +180,29 @@ class SharingService:
                     self.storage.delete(published_key)
                 raise
 
+    def get_approved_catalog(self, user: UserRecord, draft_id: str) -> ApprovedCatalog:
+        with self.database.session() as session:
+            snapshot = session.scalar(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.draft_id == draft_id,
+                    CatalogSnapshot.owner_id == user.id,
+                )
+            )
+            if snapshot is None:
+                raise ApiError(404, "NOT_FOUND", "Published catalogue not found.")
+            return ApprovedCatalog(
+                id=snapshot.id,
+                draft_id=snapshot.draft_id,
+                status="approved",
+                approved_price_paise=snapshot.approved_price_paise,
+                currency="INR",
+                public_share_id=snapshot.public_share_id,
+                public_share_url=(
+                    f"{self.settings.public_share_web_base_url}/share/{snapshot.public_share_id}"
+                ),
+                created_at=ensure_utc(snapshot.created_at),
+            )
+
     def get_share_card(self, public_share_id: str) -> PublicShareCard:
         with self.database.session() as session:
             snapshot = session.scalar(

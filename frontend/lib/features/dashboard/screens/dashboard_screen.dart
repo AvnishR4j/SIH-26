@@ -10,6 +10,7 @@ import '../../../shared/widgets/language_switch.dart';
 import '../../auth/models/auth_models.dart';
 import '../../catalogue/controllers/catalogue_flow_controller.dart';
 import '../../catalogue/models/catalogue_models.dart';
+import '../../catalogue/screens/public_catalogue_screen.dart';
 import '../../catalogue/screens/product_photo_screen.dart';
 import '../../profile/models/profile_models.dart';
 import '../../profile/screens/profile_consent_screen.dart';
@@ -60,6 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loadingDrafts = true;
   bool _draftLoadFailed = false;
   bool _creating = false;
+  String? _openingDraftId;
   CatalogueFlowController? _pendingFlow;
 
   @override
@@ -204,6 +206,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _logout() {
     widget.onLogout();
+  }
+
+  Future<void> _openPublishedCatalogue(DraftSummary draft) async {
+    if (draft.status != 'approved' || _openingDraftId != null) return;
+    setState(() => _openingDraftId = draft.id);
+    try {
+      final catalogue = await widget.apiClient.getPublishedCatalogue(draft.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PublicCatalogueScreen(
+            controller: _controller.newCatalogueFlow(),
+            publicShareId: catalogue.publicShareId,
+            language: _language,
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _openingDraftId = null);
+    }
   }
 
   @override
@@ -400,6 +427,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               draft.titleHi ??
                               strings.newCatalogue),
                     statusLabel: strings.draftStatus(draft.status),
+                    isOpening: _openingDraftId == draft.id,
+                    onTap: draft.status == 'approved'
+                        ? () => _openPublishedCatalogue(draft)
+                        : null,
                   ),
             ],
           ),
@@ -410,48 +441,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _DraftRow extends StatelessWidget {
-  const _DraftRow({required this.title, required this.statusLabel});
+  const _DraftRow({
+    required this.title,
+    required this.statusLabel,
+    required this.isOpening,
+    required this.onTap,
+  });
 
   final String title;
   final String statusLabel;
+  final bool isOpening;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(8),
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.divider)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.image_outlined,
+                color: AppColors.mutedText,
+              ),
             ),
-            child: const Icon(Icons.image_outlined, color: AppColors.mutedText),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  statusLabel,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    statusLabel,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (onTap != null)
+              isOpening
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.accent,
+                      ),
+                    )
+                  : const Icon(Icons.chevron_right, color: AppColors.mutedText),
+          ],
+        ),
       ),
     );
   }
