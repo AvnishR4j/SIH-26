@@ -72,7 +72,7 @@ class _ProductPhotoScreenState extends State<ProductPhotoScreen> {
     try {
       await widget.controller.uploadPhotoAndStartEnhancement(photo);
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => VoiceDescriptionScreen(
             controller: widget.controller,

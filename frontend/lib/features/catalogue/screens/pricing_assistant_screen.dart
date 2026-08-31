@@ -120,7 +120,7 @@ class _PricingAssistantScreenState extends State<PricingAssistantScreen> {
       price,
       outside ? _overrideReason.text.trim() : null,
     );
-    await Navigator.of(context).pushReplacement(
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FinalApprovalScreen(
           controller: widget.controller,

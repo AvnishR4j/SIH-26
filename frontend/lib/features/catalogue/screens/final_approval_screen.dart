@@ -219,6 +219,6 @@ class _FinalApprovalScreenState extends State<FinalApprovalScreen> {
 
   Future<void> _edit(Widget screen) async {
     await Navigator.of(context)
-        .pushReplacement(MaterialPageRoute<void>(builder: (_) => screen));
+        .push(MaterialPageRoute<void>(builder: (_) => screen));
   }
 }
