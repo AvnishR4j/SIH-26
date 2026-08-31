@@ -559,6 +559,42 @@ class RealApiClient implements ApiClient {
   }
 
   @override
+  Future<MarketplacePage> listMarketplaceCatalogues({
+    int limit = 20,
+    String? cursor,
+  }) async {
+    final v = await _request(
+      'GET',
+      'marketplace/catalogues',
+      auth: false,
+      query: {'limit': '$limit', ?cursor: cursor},
+    );
+    return MarketplacePage(
+      items: (v['items'] as List)
+          .cast<Map>()
+          .map((item) {
+            final artisan = (item['artisan'] as Map).cast<String, dynamic>();
+            return MarketplaceCatalogue(
+              publicShareId: item['public_share_id'] as String,
+              title: item['title'] as String,
+              description: item['description'] as String,
+              imageUrl: item['image_url'] as String,
+              pricePaise: _i(item['price_paise']),
+              currency: item['currency'] as String,
+              quantityAvailable: _i(item['quantity_available']),
+              artisan: ShareArtisan(
+                displayName: artisan['display_name'] as String,
+                cluster: artisan['cluster'] as String?,
+              ),
+              publishedAt: _d(item['published_at']),
+            );
+          })
+          .toList(growable: false),
+      nextCursor: v['next_cursor'] as String?,
+    );
+  }
+
+  @override
   Future<ShareCard> getShareCard(String id) async {
     final v = await _request('GET', 'share/$id', auth: false);
     final a = (v['artisan'] as Map).cast<String, dynamic>();

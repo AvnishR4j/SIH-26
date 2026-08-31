@@ -442,6 +442,39 @@ class MockApiClient implements ApiClient {
   }
 
   @override
+  Future<MarketplacePage> listMarketplaceCatalogues({
+    int limit = 20,
+    String? cursor,
+  }) async {
+    await _latency();
+    final entries = _shareCards.entries
+        .toList(growable: false)
+        .reversed
+        .toList();
+    final start = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final page = entries.skip(start).take(limit).toList(growable: false);
+    final next = start + page.length;
+    return MarketplacePage(
+      items: page
+          .map(
+            (entry) => MarketplaceCatalogue(
+              publicShareId: entry.key,
+              title: entry.value.title,
+              description: entry.value.description,
+              imageUrl: entry.value.imageUrl,
+              pricePaise: entry.value.pricePaise,
+              currency: entry.value.currency,
+              quantityAvailable: entry.value.quantityAvailable,
+              artisan: entry.value.artisan,
+              publishedAt: entry.value.publishedAt,
+            ),
+          )
+          .toList(growable: false),
+      nextCursor: next < entries.length ? '$next' : null,
+    );
+  }
+
+  @override
   Future<ShareCard> getShareCard(String publicShareId) async {
     await _latency();
     final card = _shareCards[publicShareId];

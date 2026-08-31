@@ -425,6 +425,37 @@ class ShareCard {
   final DateTime publishedAt;
 }
 
+class MarketplaceCatalogue {
+  const MarketplaceCatalogue({
+    required this.publicShareId,
+    required this.title,
+    required this.description,
+    required this.imageUrl,
+    required this.pricePaise,
+    required this.currency,
+    required this.quantityAvailable,
+    required this.artisan,
+    required this.publishedAt,
+  });
+
+  final String publicShareId;
+  final String title;
+  final String description;
+  final String imageUrl;
+  final int pricePaise;
+  final String currency;
+  final int quantityAvailable;
+  final ShareArtisan artisan;
+  final DateTime publishedAt;
+}
+
+class MarketplacePage {
+  const MarketplacePage({required this.items, required this.nextCursor});
+
+  final List<MarketplaceCatalogue> items;
+  final String? nextCursor;
+}
+
 class BuyerEnquiryInput {
   const BuyerEnquiryInput({
     required this.buyerName,

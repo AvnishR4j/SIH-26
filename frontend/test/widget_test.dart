@@ -49,9 +49,14 @@ void main() {
     expect(find.text('नया उत्पाद जोड़ें'), findsOneWidget);
     expect(find.byKey(const Key('createCatalogueButton')), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('exploreTab')));
+    await tester.pumpAndSettle();
+    expect(find.text('कारीगरों के उत्पाद'), findsOneWidget);
+    expect(find.text('अभी कोई प्रकाशित कैटलॉग नहीं है'), findsOneWidget);
+
     await tester.tap(find.text('English'));
     await tester.pump();
-    expect(find.text('Add a new product'), findsOneWidget);
+    expect(find.text('Explore products'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

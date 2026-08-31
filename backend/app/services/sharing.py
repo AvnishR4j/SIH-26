@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from binascii import Error as Base64Error
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from uuid import uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,8 @@ from app.schemas.sharing import (
     ApprovedCatalog,
     EnquiryRequest,
     EnquiryResponse,
+    MarketplaceCatalogue,
+    MarketplaceCataloguePage,
     PublicArtisan,
     PublicShareCard,
 )
@@ -212,6 +216,41 @@ class SharingService:
                 raise ApiError(404, "NOT_FOUND", "The shared catalogue was not found.")
             return PublicShareCard.model_validate(snapshot.payload)
 
+    def list_marketplace_catalogues(
+        self, limit: int, cursor: str | None
+    ) -> MarketplaceCataloguePage:
+        statement = select(CatalogSnapshot)
+        if cursor is not None:
+            cursor_time, cursor_id = self._decode_marketplace_cursor(cursor)
+            statement = statement.where(
+                or_(
+                    CatalogSnapshot.created_at < cursor_time,
+                    and_(
+                        CatalogSnapshot.created_at == cursor_time,
+                        CatalogSnapshot.id < cursor_id,
+                    ),
+                )
+            )
+        statement = statement.order_by(
+            CatalogSnapshot.created_at.desc(), CatalogSnapshot.id.desc()
+        ).limit(limit + 1)
+        with self.database.session() as session:
+            rows = list(session.scalars(statement))
+            page = rows[:limit]
+            next_cursor = None
+            if len(rows) > limit:
+                last = page[-1]
+                next_cursor = self._encode_marketplace_cursor(
+                    ensure_utc(last.created_at), last.id
+                )
+            return MarketplaceCataloguePage(
+                items=[
+                    self._marketplace_catalogue(row)
+                    for row in page
+                ],
+                next_cursor=next_cursor,
+            )
+
     def submit_enquiry(
         self,
         public_share_id: str,
@@ -378,6 +417,44 @@ class SharingService:
         except Exception:
             self.storage.delete(public_image_key)
             raise
+
+    @staticmethod
+    def _marketplace_catalogue(snapshot: CatalogSnapshot) -> MarketplaceCatalogue:
+        card = PublicShareCard.model_validate(snapshot.payload)
+        return MarketplaceCatalogue(
+            public_share_id=snapshot.public_share_id,
+            title=card.title,
+            description=card.description,
+            image_url=card.image_url,
+            price_paise=card.price_paise,
+            currency=card.currency,
+            quantity_available=card.quantity_available,
+            artisan=card.artisan,
+            published_at=card.published_at,
+        )
+
+    @staticmethod
+    def _encode_marketplace_cursor(created_at: datetime, catalog_id: str) -> str:
+        value = f"{created_at.isoformat()}|{catalog_id}".encode()
+        return urlsafe_b64encode(value).decode().rstrip("=")
+
+    @staticmethod
+    def _decode_marketplace_cursor(cursor: str) -> tuple[datetime, str]:
+        try:
+            padding = "=" * (-len(cursor) % 4)
+            decoded = urlsafe_b64decode(cursor + padding).decode()
+            timestamp, catalog_id = decoded.rsplit("|", 1)
+            created_at = datetime.fromisoformat(timestamp)
+            if created_at.tzinfo is None or not catalog_id.startswith("cat_"):
+                raise ValueError
+            return created_at, catalog_id
+        except (Base64Error, UnicodeDecodeError, ValueError) as error:
+            raise ApiError(
+                422,
+                "VALIDATION_ERROR",
+                "The pagination cursor is invalid.",
+                {"fields": {"cursor": "Use the cursor returned by the previous response."}},
+            ) from error
 
     @staticmethod
     def _missing_readiness(session: Session, owner_id: str, draft: Draft) -> list[str]:
