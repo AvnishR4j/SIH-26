@@ -61,7 +61,7 @@ class AuthShell extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'KalaSetu AI',
+                      'KalaSetu',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.text,

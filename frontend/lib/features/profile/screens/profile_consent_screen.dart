@@ -14,6 +14,7 @@ class ProfileConsentScreen extends StatefulWidget {
     required this.onComplete,
     required this.language,
     this.allowBack = false,
+    this.onLogout,
   });
 
   final ApiClient apiClient;
@@ -21,6 +22,7 @@ class ProfileConsentScreen extends StatefulWidget {
   final ValueChanged<ArtisanProfile> onComplete;
   final AppLanguage language;
   final bool allowBack;
+  final VoidCallback? onLogout;
 
   @override
   State<ProfileConsentScreen> createState() => _ProfileConsentScreenState();
@@ -94,6 +96,28 @@ class _ProfileConsentScreenState extends State<ProfileConsentScreen> {
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final strings = AppStrings(widget.language);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.logout),
+        content: Text(strings.logoutQuestion),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(strings.logout),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) widget.onLogout?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings(widget.language);
@@ -164,6 +188,16 @@ class _ProfileConsentScreenState extends State<ProfileConsentScreen> {
                       )
                     : Text(strings.saveAndContinue),
               ),
+              if (widget.allowBack && widget.onLogout != null) ...[
+                const Divider(height: 36, color: AppColors.divider),
+                TextButton.icon(
+                  key: const Key('logoutButton'),
+                  onPressed: _saving ? null : _confirmLogout,
+                  icon: const Icon(Icons.logout),
+                  label: Text(strings.logout),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                ),
+              ],
             ],
           ),
         ),

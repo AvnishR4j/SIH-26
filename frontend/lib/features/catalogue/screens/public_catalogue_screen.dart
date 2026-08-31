@@ -130,7 +130,7 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
           children: [
             BrandMark(compact: true),
             SizedBox(width: 10),
-            Text('KalaSetu AI', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text('KalaSetu', style: TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -172,50 +172,65 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
         ),
       );
     }
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
-      children: [
-        AspectRatio(
-          aspectRatio: 1,
-          child: ProductImage(
-            networkUrl: card.imageUrl,
-            localPath: widget.controller.state.localImagePath,
-            preferNetwork: true,
+    return LayoutBuilder(
+      builder: (context, constraints) => Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: constraints.maxWidth.clamp(0, 720),
+          height: constraints.maxHeight,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: ProductImage(
+                  networkUrl: card.imageUrl,
+                  localPath: widget.controller.state.localImagePath,
+                  preferNetwork: true,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                card.title,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                Money.formatPaise(card.pricePaise, decimals: false),
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                card.description,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '${_t('उपलब्ध मात्रा', 'Available quantity')}: ${card.quantityAvailable}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Divider(height: 36, color: AppColors.divider),
+              Text(
+                card.artisan.displayName,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              if (card.artisan.cluster != null)
+                Text(
+                  card.artisan.cluster!,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              if (card.enquiryEnabled) ...[
+                const Divider(height: 40, color: AppColors.divider),
+                if (_submitted) _success() else _enquiryForm(),
+              ],
+            ],
           ),
         ),
-        const SizedBox(height: 22),
-        Text(card.title, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 10),
-        Text(
-          Money.formatPaise(card.pricePaise, decimals: false),
-          style: const TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-            color: AppColors.text,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(card.description, style: Theme.of(context).textTheme.bodyLarge),
-        const SizedBox(height: 18),
-        Text(
-          '${_t('उपलब्ध मात्रा', 'Available quantity')}: ${card.quantityAvailable}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const Divider(height: 36, color: AppColors.divider),
-        Text(
-          card.artisan.displayName,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        if (card.artisan.cluster != null)
-          Text(
-            card.artisan.cluster!,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        if (card.enquiryEnabled) ...[
-          const Divider(height: 40, color: AppColors.divider),
-          if (_submitted) _success() else _enquiryForm(),
-        ],
-      ],
+      ),
     );
   }
 

@@ -1,4 +1,4 @@
-# kalasetu
+# KalaSetu
 
 A new Flutter project.
 
