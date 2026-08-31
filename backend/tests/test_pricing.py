@@ -172,7 +172,7 @@ def test_concurrent_pricing_retries_create_only_one_draft_version() -> None:
     assert stored.json()["version"] == 2
 
 
-def test_pricing_rejects_reused_key_stale_version_and_unknown_category() -> None:
+def test_pricing_rejects_reused_key_and_stale_version_but_falls_back_for_unknown_category() -> None:
     headers = login_headers()
     draft = create_draft(headers)
     key = str(uuid4())
@@ -196,9 +196,9 @@ def test_pricing_rejects_reused_key_stale_version_and_unknown_category() -> None
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "VERSION_CONFLICT"
     assert stale.json()["error"]["details"]["current_version"] == 2
-    assert unknown.status_code == 422
-    assert unknown.json()["error"]["code"] == "VALIDATION_ERROR"
-    assert "cotton_dupatta" in unknown.json()["error"]["details"]["available_categories"]
+    assert unknown.status_code == 200
+    assert unknown.json()["benchmark_category"] == "generic_handicraft"
+    assert any("not_a_category" in reason for reason in unknown.json()["reasons"])
 
 
 @pytest.mark.parametrize(
