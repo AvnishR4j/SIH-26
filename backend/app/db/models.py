@@ -112,6 +112,7 @@ class CatalogDraft(Base):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -302,6 +303,7 @@ class CatalogSnapshot(Base):
     price_override_reason: Mapped[str | None] = mapped_column(String(500))
     approval_note: Mapped[str | None] = mapped_column(String(1000))
     payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

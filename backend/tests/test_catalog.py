@@ -168,6 +168,25 @@ def test_get_draft_does_not_reveal_another_users_resource() -> None:
     assert response.json()["error"]["code"] == "NOT_FOUND"
 
 
+def test_delete_draft_hides_it_from_its_owner_and_other_users() -> None:
+    owner_headers = login_headers()
+    draft = create_draft(owner_headers)
+    other_headers = login_headers("+918888888888")
+
+    other_delete = client.delete(f"/api/v1/catalog/drafts/{draft['id']}", headers=other_headers)
+    deleted = client.delete(f"/api/v1/catalog/drafts/{draft['id']}", headers=owner_headers)
+
+    assert other_delete.status_code == 404
+    assert deleted.status_code == 204
+    assert (
+        client.get(f"/api/v1/catalog/drafts/{draft['id']}", headers=owner_headers).status_code
+        == 404
+    )
+    listed = client.get("/api/v1/catalog/drafts", headers=owner_headers)
+    assert listed.status_code == 200
+    assert listed.json()["items"] == []
+
+
 def test_patch_draft_updates_only_supplied_nested_fields() -> None:
     headers = login_headers()
     draft = create_draft(headers)

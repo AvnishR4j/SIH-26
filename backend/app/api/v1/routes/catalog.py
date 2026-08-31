@@ -85,6 +85,20 @@ def get_draft(
     return service.get_draft(user, draft_id)
 
 
+@router.delete(
+    "/drafts/{draft_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(401, 404, 422, 500),
+)
+def delete_draft(
+    draft_id: str,
+    user: CurrentUser,
+    service: CatalogServiceDependency,
+) -> Response:
+    service.delete_draft(user, draft_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get(
     "/drafts/{draft_id}/published",
     response_model=ApprovedCatalog,

@@ -35,6 +35,8 @@ abstract interface class ApiClient {
 
   Future<CatalogueDraft> getDraft(String draftId);
 
+  Future<void> deleteDraft(String draftId);
+
   Future<CatalogueDraft> updateDraft(String draftId, UpdateDraftInput input);
 
   Future<DraftImage> uploadDraftImage(

@@ -190,6 +190,7 @@ class SharingService:
                 select(CatalogSnapshot).where(
                     CatalogSnapshot.draft_id == draft_id,
                     CatalogSnapshot.owner_id == user.id,
+                    CatalogSnapshot.is_deleted.is_(False),
                 )
             )
             if snapshot is None:
@@ -210,7 +211,10 @@ class SharingService:
     def get_share_card(self, public_share_id: str) -> PublicShareCard:
         with self.database.session() as session:
             snapshot = session.scalar(
-                select(CatalogSnapshot).where(CatalogSnapshot.public_share_id == public_share_id)
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.public_share_id == public_share_id,
+                    CatalogSnapshot.is_deleted.is_(False),
+                )
             )
             if snapshot is None:
                 raise ApiError(404, "NOT_FOUND", "The shared catalogue was not found.")
@@ -219,7 +223,7 @@ class SharingService:
     def list_marketplace_catalogues(
         self, limit: int, cursor: str | None
     ) -> MarketplaceCataloguePage:
-        statement = select(CatalogSnapshot)
+        statement = select(CatalogSnapshot).where(CatalogSnapshot.is_deleted.is_(False))
         if cursor is not None:
             cursor_time, cursor_id = self._decode_marketplace_cursor(cursor)
             statement = statement.where(
@@ -267,7 +271,10 @@ class SharingService:
 
                     snapshot = session.scalar(
                         select(CatalogSnapshot)
-                        .where(CatalogSnapshot.public_share_id == public_share_id)
+                        .where(
+                            CatalogSnapshot.public_share_id == public_share_id,
+                            CatalogSnapshot.is_deleted.is_(False),
+                        )
                         .with_for_update()
                     )
                     if snapshot is None:

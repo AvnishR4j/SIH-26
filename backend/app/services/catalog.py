@@ -136,7 +136,10 @@ class CatalogService:
         cursor: str | None,
         status: DraftStatus | None,
     ) -> DraftList:
-        statement = select(CatalogDraft).where(CatalogDraft.owner_id == user.id)
+        statement = select(CatalogDraft).where(
+            CatalogDraft.owner_id == user.id,
+            CatalogDraft.is_deleted.is_(False),
+        )
         if status is not None:
             statement = statement.where(CatalogDraft.status == status)
         if cursor is not None:
@@ -174,6 +177,27 @@ class CatalogService:
         with self.database.session() as session:
             draft = self._owned_draft(session, user.id, draft_id)
             return refresh_draft_image_urls(session, draft, self.storage)
+
+    def delete_draft(self, user: UserRecord, draft_id: str) -> None:
+        with self._lock, self.database.session() as session, session.begin():
+            self._owned_draft(session, user.id, draft_id)
+            session.execute(
+                update(CatalogDraft)
+                .where(
+                    CatalogDraft.id == draft_id,
+                    CatalogDraft.owner_id == user.id,
+                    CatalogDraft.is_deleted.is_(False),
+                )
+                .values(is_deleted=True, updated_at=datetime.now(UTC))
+            )
+            session.execute(
+                update(CatalogSnapshot)
+                .where(
+                    CatalogSnapshot.draft_id == draft_id,
+                    CatalogSnapshot.owner_id == user.id,
+                )
+                .values(is_deleted=True)
+            )
 
     def update_draft(self, user: UserRecord, draft_id: str, request: DraftPatch) -> Draft:
         with self._lock, self.database.session() as session, session.begin():
@@ -246,6 +270,7 @@ class CatalogService:
             select(CatalogDraft).where(
                 CatalogDraft.id == draft_id,
                 CatalogDraft.owner_id == owner_id,
+                CatalogDraft.is_deleted.is_(False),
             )
         )
         if row is None:

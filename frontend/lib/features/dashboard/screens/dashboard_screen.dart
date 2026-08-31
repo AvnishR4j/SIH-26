@@ -64,6 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _creating = false;
   int _selectedTab = 0;
   String? _openingDraftId;
+  String? _deletingDraftId;
   CatalogueFlowController? _pendingFlow;
 
   @override
@@ -232,6 +233,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } finally {
       if (mounted) setState(() => _openingDraftId = null);
+    }
+  }
+
+  Future<void> _confirmDeleteDraft(DraftSummary draft) async {
+    if (_deletingDraftId != null) return;
+    final strings = AppStrings(_language);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.deleteCatalogue),
+        content: Text(strings.deleteCatalogueQuestion),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(strings.deleteCatalogue),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingDraftId = draft.id);
+    try {
+      await widget.apiClient.deleteDraft(draft.id);
+      if (!mounted) return;
+      setState(
+        () => _drafts = _drafts.where((item) => item.id != draft.id).toList(),
+      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(strings.catalogueDeleted)));
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(strings.deleteFailed)));
+      }
+    } finally {
+      if (mounted) setState(() => _deletingDraftId = null);
     }
   }
 
@@ -432,10 +479,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     draft.titleHi ??
                                     strings.newCatalogue),
                           statusLabel: strings.draftStatus(draft.status),
+                          language: _language,
                           isOpening: _openingDraftId == draft.id,
+                          isDeleting: _deletingDraftId == draft.id,
                           onTap: draft.status == 'approved'
                               ? () => _openPublishedCatalogue(draft)
                               : null,
+                          onDelete: () => _confirmDeleteDraft(draft),
                         ),
                   ],
                 ),
@@ -473,17 +523,24 @@ class _DraftRow extends StatelessWidget {
   const _DraftRow({
     required this.title,
     required this.statusLabel,
+    required this.language,
     required this.isOpening,
+    required this.isDeleting,
     required this.onTap,
+    required this.onDelete,
   });
 
   final String title;
   final String statusLabel;
+  final AppLanguage language;
   final bool isOpening;
+  final bool isDeleting;
   final VoidCallback? onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings(language);
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -523,7 +580,15 @@ class _DraftRow extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null)
+            if (isDeleting)
+              const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.accent,
+                ),
+              )
+            else if (onTap != null)
               isOpening
                   ? const SizedBox.square(
                       dimension: 20,
@@ -532,7 +597,48 @@ class _DraftRow extends StatelessWidget {
                         color: AppColors.accent,
                       ),
                     )
-                  : const Icon(Icons.chevron_right, color: AppColors.mutedText),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.mutedText,
+                        ),
+                        PopupMenuButton<String>(
+                          tooltip: strings.deleteCatalogue,
+                          onSelected: (_) => onDelete(),
+                          itemBuilder: (context) => [
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.delete_outline),
+                                  const SizedBox(width: 10),
+                                  Text(strings.deleteCatalogue),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+            else
+              PopupMenuButton<String>(
+                tooltip: strings.deleteCatalogue,
+                onSelected: (_) => onDelete(),
+                itemBuilder: (context) => [
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline),
+                        const SizedBox(width: 10),
+                        Text(strings.deleteCatalogue),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
