@@ -62,10 +62,12 @@ class Settings(BaseSettings):
     rembg_model: Literal["u2net", "u2netp", "isnet-general-use"] = "u2net"
     rembg_model_cache_dir: Path = Path("./models/rembg")
     speech_provider: Literal["faster_whisper"] = "faster_whisper"
-    whisper_model_size: str = "small"
+    whisper_model_size: str = "medium"
     whisper_device: Literal["cpu", "cuda"] = "cpu"
     whisper_compute_type: str = "int8"
     whisper_cpu_threads: int = Field(default=4, ge=1, le=64)
+    whisper_beam_size: int = Field(default=8, ge=1, le=10)
+    whisper_vad_min_silence_ms: int = Field(default=500, ge=100, le=5000)
     whisper_model_cache_dir: Path = Path("./models/faster-whisper")
     catalogue_generation_provider: Literal["mock", "gemini"] = "mock"
     gemini_api_key: SecretStr | None = None

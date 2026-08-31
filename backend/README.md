@@ -120,10 +120,11 @@ snapshot are persisted. Listing generation transcribes the selected voice note
 with local `faster-whisper`; no speech API key or BHASHINI credential is used.
 
 The model is loaded lazily on the first generation request. The default
-`WHISPER_MODEL_SIZE=small`, CPU `int8` configuration favors Hindi accuracy while
-remaining practical on a development laptop. The first request downloads the
-model into `WHISPER_MODEL_CACHE_DIR`; pre-warm that cache while online before a
-demo. Model files are ignored by Git.
+`WHISPER_MODEL_SIZE=medium`, CPU `int8` configuration favors Hindi accuracy over
+the smaller model while remaining practical on a development laptop. Hindi uses
+deterministic beam decoding, voice-activity filtering, and a craft-specific
+prompt. The first request downloads the model into `WHISPER_MODEL_CACHE_DIR`;
+pre-warm that cache while online before a demo. Model files are ignored by Git.
 
 `CATALOGUE_GENERATION_PROVIDER=mock` is the default and intentionally creates
 only a grounded listing scaffold. Set it to `gemini` and provide a server-side
