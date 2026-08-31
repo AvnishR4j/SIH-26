@@ -6,6 +6,12 @@ import 'mock_fixtures.dart';
 
 class MockApiClient implements ApiClient {
   final Map<String, OtpRequestResponse> _otpRequests = {};
+
+  @override
+  void restoreSession(AuthSession session) {}
+
+  @override
+  void clearSession() {}
   final Map<String, CatalogueDraft> _drafts = {};
   final Map<String, CatalogueDraft> _draftCreations = {};
   final Map<String, DraftImage> _imageUploads = {};

@@ -3,6 +3,10 @@ import '../../features/catalogue/models/catalogue_models.dart';
 import '../../features/profile/models/profile_models.dart';
 
 abstract interface class ApiClient {
+  void restoreSession(AuthSession session);
+
+  void clearSession();
+
   Future<OtpRequestResponse> requestOtp(
     OtpRequest request, {
     required String idempotencyKey,

@@ -10,7 +10,6 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/auth_shell.dart';
 import '../models/auth_models.dart';
-import 'post_auth_gate.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({
@@ -20,6 +19,7 @@ class OtpScreen extends StatefulWidget {
     required this.otpRequest,
     required this.language,
     required this.onLanguageChanged,
+    required this.onAuthenticated,
   });
 
   final ApiClient apiClient;
@@ -27,6 +27,7 @@ class OtpScreen extends StatefulWidget {
   final OtpRequestResponse otpRequest;
   final AppLanguage language;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final Future<void> Function(AuthSession session) onAuthenticated;
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -89,17 +90,10 @@ class _OtpScreenState extends State<OtpScreen> {
         ),
       );
       if (!mounted) return;
-      await Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => PostAuthGate(
-            apiClient: widget.apiClient,
-            session: session,
-            language: _language,
-            onLanguageChanged: widget.onLanguageChanged,
-          ),
-        ),
-        (route) => false,
-      );
+      await widget.onAuthenticated(session);
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {

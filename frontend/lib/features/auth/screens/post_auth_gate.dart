@@ -16,12 +16,14 @@ class PostAuthGate extends StatefulWidget {
     required this.session,
     required this.language,
     required this.onLanguageChanged,
+    required this.onLogout,
   });
 
   final ApiClient apiClient;
   final AuthSession session;
   final AppLanguage language;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final VoidCallback onLogout;
 
   @override
   State<PostAuthGate> createState() => _PostAuthGateState();
@@ -87,6 +89,7 @@ class _PostAuthGateState extends State<PostAuthGate> {
       profile: profile,
       language: widget.language,
       onLanguageChanged: widget.onLanguageChanged,
+      onLogout: widget.onLogout,
     );
   }
 }
