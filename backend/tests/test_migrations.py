@@ -19,6 +19,8 @@ APPLICATION_TABLES = {
     "operation_idempotency",
     "voice_media",
     "voice_upload_idempotency",
+    "pricing_benchmarks",
+    "pricing_suggestion_idempotency",
 }
 
 

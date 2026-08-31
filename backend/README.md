@@ -26,11 +26,12 @@ Open:
 
 ## Development authentication
 
-The backend implements the frozen OTP, profile, catalogue draft, and image
-workflow contract with transactional PostgreSQL persistence. Request an OTP with an
-`Idempotency-Key` header, then verify it with the development code `123456`.
-Users, profiles, consent, retry records, and drafts survive server restarts.
-OTPs are stored as keyed hashes and are consumed atomically.
+The backend implements the frozen OTP, profile, catalogue draft, media, voice,
+and explainable-pricing workflow contract with transactional PostgreSQL
+persistence. Request an OTP with an `Idempotency-Key` header, then verify it
+with the development code `123456`. Users, profiles, consent, retry records,
+drafts, media metadata, transcripts, and pricing suggestions survive server
+restarts. OTPs are stored as keyed hashes and are consumed atomically.
 
 Implemented routes:
 
@@ -48,6 +49,7 @@ Implemented routes:
 - `PATCH /api/v1/catalog/drafts/{draft_id}/images/{image_id}`
 - `POST /api/v1/catalog/drafts/{draft_id}/voice-notes`
 - `POST /api/v1/catalog/drafts/{draft_id}/generate-listing`
+- `POST /api/v1/catalog/drafts/{draft_id}/pricing/suggest`
 - `GET /api/v1/operations/{operation_id}`
 
 Draft creation requires a UUID `Idempotency-Key`. Draft updates require the
@@ -90,6 +92,21 @@ does not translate or infer unspoken product facts; missing fields remain
 explicit for artisan confirmation. A later LLM provider can fill those fields
 behind the same frozen HTTP contract.
 
+## Explainable pricing
+
+Pricing suggestions are deterministic backend calculations, not AI-generated
+prices. The calculation combines the artisan's material, labour, packaging,
+and logistics inputs with a versioned benchmark category. Every response
+includes the full cost breakdown, benchmark source label and date, confidence,
+and an `is_demo_data` flag. Suggestions are advice only and never force the
+final approved selling price.
+
+The repository currently ships clearly labelled demo benchmark rows for local
+and integration testing. Replace them with reviewed, attributable benchmark
+data before production use. Pricing requests require both the current draft
+`version` and a UUID `Idempotency-Key`; retries return the original response
+without incrementing the draft twice.
+
 ## Database migrations
 
 Run migrations before starting any shared or production-like deployment:
@@ -106,8 +123,9 @@ tests. Production rejects it so schema changes cannot bypass migration history.
 
 For Supabase, use the server-side direct or Session pooler PostgreSQL URL with
 TLS enabled. Never place the database password or a service-role key in Flutter.
-The migration enables Row Level Security on every application table without
-adding client policies; data access is intentionally restricted to this backend.
+The migration enables Row Level Security on every application table. Sensitive
+records have no direct client policies and remain restricted to this backend;
+the non-sensitive demo pricing benchmark table has a read-only policy.
 
 Frontend development URLs:
 
