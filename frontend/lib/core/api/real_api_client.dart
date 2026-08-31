@@ -390,6 +390,11 @@ class RealApiClient implements ApiClient {
   Future<CatalogueDraft> getDraft(String id) async =>
       _draft(await _request('GET', 'catalog/drafts/$id'));
   @override
+  Future<void> deleteDraft(String id) async {
+    await _request('DELETE', 'catalog/drafts/$id');
+  }
+
+  @override
   Future<CatalogueDraft> updateDraft(String id, UpdateDraftInput x) async =>
       _draft(
         await _request(

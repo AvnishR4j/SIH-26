@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kalasetu/core/api/api_client.dart';
 import 'package:kalasetu/core/api/mock_api_client.dart';
 import 'package:kalasetu/features/catalogue/models/catalogue_models.dart';
 
@@ -116,6 +117,11 @@ void main() {
       expect(marketplace.items.single.publicShareId, approved.publicShareId);
       expect(marketplace.items.single.artisan.displayName, 'Sita Devi');
 
+      await api.deleteDraft(draft.id);
+      expect((await api.listDrafts()).items, isEmpty);
+      expect((await api.listMarketplaceCatalogues()).items, isEmpty);
+      expect(() => api.getDraft(draft.id), throwsA(isA<ApiException>()));
+
       const enquiryInput = BuyerEnquiryInput(
         buyerName: 'Aarav Retail',
         buyerPhone: '+918888888888',
@@ -123,18 +129,14 @@ void main() {
         message: 'Interested in 20 pieces',
         consentToContact: true,
       );
-      final enquiry = await api.submitEnquiry(
-        approved.publicShareId,
-        enquiryInput,
-        idempotencyKey: 'enquiry-key',
+      expect(
+        () => api.submitEnquiry(
+          approved.publicShareId,
+          enquiryInput,
+          idempotencyKey: 'enquiry-key',
+        ),
+        throwsA(isA<ApiException>()),
       );
-      final replayedEnquiry = await api.submitEnquiry(
-        approved.publicShareId,
-        enquiryInput,
-        idempotencyKey: 'enquiry-key',
-      );
-      expect(enquiry.status, 'received');
-      expect(replayedEnquiry.enquiryId, enquiry.enquiryId);
     },
   );
 }

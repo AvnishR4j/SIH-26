@@ -147,6 +147,21 @@ class MockApiClient implements ApiClient {
   }
 
   @override
+  Future<void> deleteDraft(String draftId) async {
+    await _latency();
+    _requireDraft(draftId);
+    final shareIds = _approvals.values
+        .where((catalogue) => catalogue.draftId == draftId)
+        .map((catalogue) => catalogue.publicShareId)
+        .toList(growable: false);
+    _drafts.remove(draftId);
+    _approvals.removeWhere((_, catalogue) => catalogue.draftId == draftId);
+    for (final shareId in shareIds) {
+      _shareCards.remove(shareId);
+    }
+  }
+
+  @override
   Future<CatalogueDraft> updateDraft(
     String draftId,
     UpdateDraftInput input,

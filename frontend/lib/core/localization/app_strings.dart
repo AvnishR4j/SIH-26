@@ -228,6 +228,15 @@ class AppStrings {
   String get draftLoadFailed => isHindi
       ? 'हाल के कैटलॉग लोड नहीं हो सके।'
       : 'Recent catalogues could not be loaded.';
+  String get deleteCatalogue => isHindi ? 'कैटलॉग हटाएं' : 'Delete catalogue';
+  String get deleteCatalogueQuestion => isHindi
+      ? 'क्या आप इस कैटलॉग को हटाना चाहते हैं? इसे सार्वजनिक रूप से नहीं दिखाया जाएगा।'
+      : 'Delete this catalogue? It will no longer be visible publicly.';
+  String get catalogueDeleted =>
+      isHindi ? 'कैटलॉग हटा दिया गया है।' : 'Catalogue deleted.';
+  String get deleteFailed => isHindi
+      ? 'कैटलॉग हटाया नहीं जा सका। फिर कोशिश करें।'
+      : 'The catalogue could not be deleted. Please try again.';
   String get tagsLabel => isHindi ? 'खोज के शब्द' : 'SEO tags';
   String get tagsHint => isHindi
       ? 'जैसे cotton dupatta, hand embroidery'

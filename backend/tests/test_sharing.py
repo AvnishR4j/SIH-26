@@ -526,8 +526,26 @@ def test_marketplace_lists_only_safe_approved_catalogues_with_pagination() -> No
     assert invalid.status_code == 422
 
 
+def test_delete_hides_an_approved_catalogue_from_public_surfaces() -> None:
+    headers = login_headers()
+    draft = prepare_ready_draft(headers)
+    approved = approve(headers, draft["id"])
+    assert approved.status_code == 201
+    share_id = approved.json()["public_share_id"]
+
+    deleted = client.delete(f"/api/v1/catalog/drafts/{draft['id']}", headers=headers)
+
+    assert deleted.status_code == 204
+    assert client.get(f"/api/v1/share/{share_id}").status_code == 404
+    assert submit_enquiry(share_id, enquiry_payload()).status_code == 404
+    marketplace = client.get("/api/v1/marketplace/catalogues")
+    assert marketplace.status_code == 200
+    assert marketplace.json()["items"] == []
+
+
 def test_openapi_documents_approval_share_and_enquiry_contracts() -> None:
     paths = app.openapi()["paths"]
+    delete = paths["/api/v1/catalog/drafts/{draft_id}"]["delete"]
     approval = paths["/api/v1/catalog/drafts/{draft_id}/approve"]["post"]
     share = paths["/api/v1/share/{public_share_id}"]["get"]
     enquiry = paths["/api/v1/share/{public_share_id}/enquiries"]["post"]
@@ -541,3 +559,4 @@ def test_openapi_documents_approval_share_and_enquiry_contracts() -> None:
     assert enquiry["responses"]["201"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/EnquiryResponse"
     }
+    assert delete["responses"]["204"]["description"] == "Successful Response"
