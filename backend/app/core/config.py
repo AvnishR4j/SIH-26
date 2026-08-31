@@ -57,7 +57,10 @@ class Settings(BaseSettings):
     max_audio_duration_seconds: int = Field(default=120, ge=1, le=120)
     ai_operation_poll_after_seconds: int = Field(default=2, ge=1, le=60)
     ai_provider_timeout_seconds: int = Field(default=45, ge=1, le=120)
-    image_enhancement_provider: Literal["mock"] = "mock"
+    image_enhancement_provider: Literal["mock", "rembg"] = "mock"
+    image_enhancement_max_side: int = Field(default=4096, ge=512, le=8192)
+    rembg_model: Literal["u2net", "u2netp", "isnet-general-use"] = "u2net"
+    rembg_model_cache_dir: Path = Path("./models/rembg")
     speech_provider: Literal["faster_whisper"] = "faster_whisper"
     whisper_model_size: str = "small"
     whisper_device: Literal["cpu", "cuda"] = "cpu"

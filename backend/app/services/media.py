@@ -7,7 +7,7 @@ from hashlib import sha256
 from io import BytesIO
 from uuid import uuid4
 
-from PIL import Image, ImageEnhance, ImageOps, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -31,6 +31,11 @@ from app.schemas.catalog import (
 )
 from app.schemas.operations import OperationResponse
 from app.services.auth import UserRecord
+from app.services.image_enhancement import (
+    ImageEnhancer,
+    create_image_enhancer,
+    get_image_enhancer,
+)
 from app.services.media_urls import refresh_draft_image_urls, refresh_image_urls
 from app.storage.base import MediaStorage
 from app.storage.factory import create_media_storage, get_media_storage
@@ -48,10 +53,12 @@ class MediaService:
         settings: Settings,
         database: Database | None = None,
         storage: MediaStorage | None = None,
+        image_enhancer: ImageEnhancer | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
         self.storage = storage or create_media_storage(settings)
+        self.image_enhancer = image_enhancer or create_image_enhancer(settings)
         self._lock = self.database.write_lock
 
     def upload_image(
@@ -309,7 +316,7 @@ class MediaService:
                     raise ApiError(404, "NOT_FOUND", "The image was not found.")
                 original_key = media.original_key
 
-            enhanced = self._enhance_image(
+            enhanced = self.image_enhancer.enhance(
                 self.storage.read(original_key),
                 background=str(payload["background"]),
                 crop_style=str(payload["crop_style"]),
@@ -544,21 +551,6 @@ class MediaService:
             )
         return IMAGE_FORMATS[image_format]
 
-    @staticmethod
-    def _enhance_image(content: bytes, background: str, crop_style: str) -> bytes:
-        with Image.open(BytesIO(content)) as source:
-            image = ImageOps.exif_transpose(source).convert("RGB")
-        if crop_style == "marketplace_square":
-            side = max(image.size)
-            fill = (245, 245, 245) if background == "neutral" else (255, 255, 255)
-            image = ImageOps.pad(image, (side, side), method=Image.Resampling.LANCZOS, color=fill)
-        image = ImageOps.autocontrast(image, cutoff=1)
-        image = ImageEnhance.Contrast(image).enhance(1.05)
-        image = ImageEnhance.Sharpness(image).enhance(1.1)
-        output = BytesIO()
-        image.save(output, format="JPEG", quality=90, optimize=True)
-        return output.getvalue()
-
     def _require_current_consent(self, user: UserRecord) -> None:
         if not user.media_processing_accepted or (
             user.policy_version != self.settings.media_consent_policy_version
@@ -688,4 +680,9 @@ class MediaService:
 
 @lru_cache
 def get_media_service() -> MediaService:
-    return MediaService(get_settings(), get_database(), get_media_storage())
+    return MediaService(
+        get_settings(),
+        get_database(),
+        get_media_storage(),
+        get_image_enhancer(),
+    )
