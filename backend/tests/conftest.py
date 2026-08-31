@@ -15,6 +15,8 @@ os.environ.setdefault("DATABASE_URL", f"sqlite+pysqlite:///{TEST_DATABASE_PATH}"
 os.environ.setdefault("DATABASE_AUTO_CREATE", "true")
 os.environ.setdefault("MEDIA_LOCAL_DIR", str(TEST_MEDIA_PATH))
 os.environ.setdefault("MEDIA_URL_BASE", "http://testserver/media")
+# Keep API-flow tests deterministic even when a developer configures Gemini locally.
+os.environ["CATALOGUE_GENERATION_PROVIDER"] = "mock"
 
 
 def pytest_sessionfinish() -> None:
