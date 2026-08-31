@@ -42,6 +42,7 @@ class _CatalogueReviewScreenState extends State<CatalogueReviewScreen> {
       'titleEn': TextEditingController(text: listing.titleEn),
       'descriptionHi': TextEditingController(text: listing.descriptionHi),
       'descriptionEn': TextEditingController(text: listing.descriptionEn),
+      'tags': TextEditingController(text: listing.tags.join(', ')),
       'productType': TextEditingController(text: facts.productType),
       'material': TextEditingController(text: facts.material),
       'technique': TextEditingController(text: facts.technique),
@@ -96,6 +97,12 @@ class _CatalogueReviewScreenState extends State<CatalogueReviewScreen> {
           titleEn: _fields['titleEn']!.text.trim(),
           descriptionHi: _fields['descriptionHi']!.text.trim(),
           descriptionEn: _fields['descriptionEn']!.text.trim(),
+          tags: _fields['tags']!.text
+              .split(',')
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty)
+              .toSet()
+              .toList(growable: false),
         ),
       );
       if (!mounted) return;
@@ -155,6 +162,14 @@ class _CatalogueReviewScreenState extends State<CatalogueReviewScreen> {
                 'English description',
                 required: true,
                 lines: 3,
+              ),
+              _input('tags', _t('खोज के शब्द', 'SEO tags')),
+              Text(
+                _t(
+                  'शब्दों को कॉमा से अलग करें, जैसे cotton dupatta, hand embroidery',
+                  'Separate tags with commas, for example cotton dupatta, hand embroidery',
+                ),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
               const Divider(height: 36, color: AppColors.divider),
               Text(

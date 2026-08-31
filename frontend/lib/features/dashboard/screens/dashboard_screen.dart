@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/language_switch.dart';
 import '../../auth/models/auth_models.dart';
+import '../../auth/screens/login_screen.dart';
 import '../../catalogue/controllers/catalogue_flow_controller.dart';
 import '../../catalogue/models/catalogue_models.dart';
 import '../../catalogue/screens/product_photo_screen.dart';
@@ -38,11 +39,25 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const _demoCraftCategories = [
+    'textile',
+    'embroidery',
+    'handloom',
+    'pottery',
+    'jewellery',
+    'woodcraft',
+    'metalcraft',
+    'basketry',
+    'painting',
+    'leathercraft',
+  ];
+
   late AppLanguage _language;
   late ArtisanProfile _profile;
   late final HomeController _controller;
   List<DraftSummary> _drafts = const [];
   bool _loadingDrafts = true;
+  bool _draftLoadFailed = false;
   bool _creating = false;
   CatalogueFlowController? _pendingFlow;
 
@@ -59,11 +74,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDrafts() async {
+    if (mounted) {
+      setState(() {
+        _loadingDrafts = true;
+        _draftLoadFailed = false;
+      });
+    }
     try {
       final drafts = await _controller.loadRecentDrafts();
       if (mounted) setState(() => _drafts = drafts);
     } catch (_) {
-      // Home remains usable even when the optional recent list cannot load.
+      if (mounted) setState(() => _draftLoadFailed = true);
     } finally {
       if (mounted) setState(() => _loadingDrafts = false);
     }
@@ -71,7 +92,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<String?> _chooseCategory() async {
     final strings = AppStrings(_language);
-    final categories = _profile.craftCategories;
+    final categories = {
+      ..._profile.craftCategories,
+      ..._demoCraftCategories,
+    }.toList(growable: false);
     if (categories.isEmpty) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -94,25 +118,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       backgroundColor: AppColors.surface,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.72,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                strings.categoryQuestion,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              for (final category in categories)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(strings.categoryLabel(category)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).pop(category),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                child: Text(
+                  strings.categoryQuestion,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+                  itemCount: categories.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: AppColors.divider),
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(strings.categoryLabel(category)),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).pop(category),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -154,12 +191,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           profile: _profile,
           language: _language,
           allowBack: true,
+          onLogout: _logout,
           onComplete: (profile) {
             setState(() => _profile = profile);
             Navigator.of(context).pop();
           },
         ),
       ),
+    );
+  }
+
+  void _logout() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => LoginScreen(
+          apiClient: widget.apiClient,
+          language: _language,
+          onLanguageChanged: widget.onLanguageChanged,
+        ),
+      ),
+      (_) => false,
     );
   }
 
@@ -177,7 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             BrandMark(compact: true),
             SizedBox(width: 10),
             Text(
-              'KalaSetu AI',
+              'KalaSetu',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
             ),
           ],
@@ -219,7 +270,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Text(
                 strings.greeting(_profile.name),
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: const TextStyle(
+                  color: AppColors.darkAccent,
+                  fontFamily: 'serif',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
               ),
               const SizedBox(height: 24),
               Container(
@@ -294,7 +351,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: CircularProgressIndicator(color: AppColors.accent),
                   ),
                 )
-              else if (_drafts.isEmpty) ...[
+              else if (_draftLoadFailed) ...[
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  size: 42,
+                  color: AppColors.mutedText,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  strings.draftLoadFailed,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Center(
+                  child: OutlinedButton.icon(
+                    onPressed: _loadDrafts,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(strings.tryAgain),
+                  ),
+                ),
+              ] else if (_drafts.isEmpty) ...[
                 const SizedBox(height: 10),
                 const Icon(
                   Icons.inventory_2_outlined,

@@ -54,6 +54,14 @@ class AppStrings {
   String categoryLabel(String category) => switch (category) {
     'textile' => isHindi ? 'वस्त्र' : 'Textile',
     'embroidery' => isHindi ? 'कढ़ाई' : 'Embroidery',
+    'handloom' => isHindi ? 'हथकरघा' : 'Handloom',
+    'pottery' => isHindi ? 'मिट्टी के बर्तन' : 'Pottery',
+    'jewellery' => isHindi ? 'आभूषण' : 'Jewellery',
+    'woodcraft' => isHindi ? 'लकड़ी की कला' : 'Woodcraft',
+    'metalcraft' => isHindi ? 'धातु शिल्प' : 'Metal craft',
+    'basketry' => isHindi ? 'टोकरी बुनाई' : 'Basketry',
+    'painting' => isHindi ? 'चित्रकला' : 'Painting',
+    'leathercraft' => isHindi ? 'चमड़ा शिल्प' : 'Leather craft',
     _ => category,
   };
   String get newCatalogue => isHindi ? 'नया कैटलॉग' : 'New catalogue';
@@ -217,4 +225,16 @@ class AppStrings {
   String get profileLoadFailed => isHindi
       ? 'प्रोफ़ाइल लोड नहीं हो सकी।'
       : 'The profile could not be loaded.';
+  String get draftLoadFailed => isHindi
+      ? 'हाल के कैटलॉग लोड नहीं हो सके।'
+      : 'Recent catalogues could not be loaded.';
+  String get tagsLabel => isHindi ? 'खोज के शब्द' : 'SEO tags';
+  String get tagsHint => isHindi
+      ? 'जैसे cotton dupatta, hand embroidery'
+      : 'For example: cotton dupatta, hand embroidery';
+  String get logout => isHindi ? 'लॉग आउट' : 'Log out';
+  String get logoutQuestion => isHindi
+      ? 'क्या आप KalaSetu से लॉग आउट करना चाहते हैं?'
+      : 'Do you want to log out of KalaSetu?';
+  String get cancel => isHindi ? 'रद्द करें' : 'Cancel';
 }

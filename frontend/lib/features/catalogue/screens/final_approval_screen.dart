@@ -149,6 +149,30 @@ class _FinalApprovalScreenState extends State<FinalApprovalScreen> {
               listing.descriptionEn,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (listing.tags.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tag in listing.tags)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Text('#$tag'),
+                      ),
+                    ),
+                ],
+              ),
+            ],
             const Divider(height: 36, color: AppColors.divider),
             DetailRow(
               label: _t('उत्पाद', 'Product'),
