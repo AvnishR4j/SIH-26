@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import get_database
 from app.main import app
+from app.storage.factory import get_media_storage
 
 client = TestClient(app)
 
@@ -49,6 +50,22 @@ def test_health_reports_degraded_when_database_is_unavailable() -> None:
         response = client.get("/api/v1/health")
     finally:
         app.dependency_overrides.pop(get_database, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+
+
+def test_health_reports_degraded_when_storage_is_unavailable() -> None:
+    class UnavailableStorage:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+    app.dependency_overrides[get_media_storage] = UnavailableStorage
+    try:
+        response = client.get("/api/v1/health")
+    finally:
+        app.dependency_overrides.pop(get_media_storage, None)
 
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"

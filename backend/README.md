@@ -76,6 +76,23 @@ media; production must use a private object store with short-lived signed URLs.
 The original is never replaced, and an enhanced image is used only after the
 artisan explicitly selects that variant.
 
+For production, set `MEDIA_STORAGE=supabase`, `SUPABASE_URL`, and the server-only
+`SUPABASE_SECRET_KEY`. Create a private `kalasetu-private` bucket for draft
+images and voice notes, and a public `kalasetu-public` bucket for only the image
+copied during final approval. The names are configurable. Private object URLs
+are signed for `SUPABASE_SIGNED_URL_TTL_SECONDS` and refreshed whenever a draft
+or draft list is fetched; public share-image URLs remain stable. Never send the
+secret key to Flutter or place it in Git.
+
+`GET /api/v1/health` reports `degraded` unless both configured buckets exist and
+their access modes match this private/public split. Use that check before
+connecting Flutter to a shared backend deployment.
+
+The backend uses standard Storage uploads. Supabase recommends resumable uploads
+above 6 MB; KalaSetu still enforces its 10 MB image and 25 MB audio limits and
+uploads from the trusted backend, so production acceptance testing must include
+files near both configured limits.
+
 ## Local speech transcription
 
 Voice uploads accept decoded M4A, MP3, WAV, or WebM audio up to 25 MB and 120
@@ -132,10 +149,10 @@ numbers, cost inputs, pricing confidence, AI metadata, and unselected media.
 Buyer enquiries require explicit contact consent, use share-scoped idempotency,
 and are rate-limited per buyer phone and catalogue.
 
-`MEDIA_STORAGE=local` supports this flow for development. Production must use a
-private draft-media store plus a deliberate public publishing adapter for the
-artisan-selected share image. The application fails closed if local media is
-configured under `ENVIRONMENT=production`.
+`MEDIA_STORAGE=local` supports this flow for development. The Supabase adapter
+stores draft media privately and publishes only the artisan-selected share
+image to the public bucket. The application fails closed if local media is
+configured under `ENVIRONMENT=production` or if Supabase credentials are absent.
 
 ## Database migrations
 

@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -41,9 +42,15 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/kalasetu"
     database_echo: bool = False
     database_auto_create: bool = False
-    media_storage: Literal["local"] = "local"
+    media_storage: Literal["local", "supabase"] = "local"
     media_local_dir: Path = Path("./media")
     media_url_base: str = "http://localhost:8000/media"
+    supabase_url: str | None = None
+    supabase_secret_key: SecretStr | None = None
+    supabase_private_bucket: str = "kalasetu-private"
+    supabase_public_bucket: str = "kalasetu-public"
+    supabase_signed_url_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    supabase_storage_timeout_seconds: int = Field(default=30, ge=1, le=120)
     max_image_bytes: int = Field(default=10_485_760, ge=1)
     max_image_pixels: int = Field(default=25_000_000, ge=1)
     max_audio_bytes: int = Field(default=26_214_400, ge=1)
@@ -85,6 +92,24 @@ class Settings(BaseSettings):
             raise ValueError("Public URLs must be absolute HTTP(S) URLs")
         return normalized
 
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().rstrip("/")
+        if not normalized.startswith(("http://", "https://")):
+            raise ValueError("SUPABASE_URL must be an absolute HTTP(S) URL")
+        return normalized
+
+    @field_validator("supabase_private_bucket", "supabase_public_bucket")
+    @classmethod
+    def validate_bucket_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}", cleaned) is None:
+            raise ValueError("Supabase bucket names contain unsupported characters")
+        return cleaned
+
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
         if self.environment == "production" and self.dev_otp is not None:
@@ -115,6 +140,23 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MEDIA_STORAGE=local is development-only; configure private object storage"
             )
+        if self.media_storage == "supabase" and (
+            self.supabase_url is None
+            or self.supabase_secret_key is None
+            or not self.supabase_secret_key.get_secret_value().strip()
+        ):
+            raise ValueError(
+                "SUPABASE_URL and SUPABASE_SECRET_KEY are required when MEDIA_STORAGE=supabase"
+            )
+        if (
+            self.media_storage == "supabase"
+            and self.supabase_private_bucket == self.supabase_public_bucket
+        ):
+            raise ValueError("Supabase private and public buckets must be different")
+        if self.environment == "production" and self.media_storage == "supabase":
+            assert self.supabase_url is not None
+            if not self.supabase_url.startswith("https://"):
+                raise ValueError("SUPABASE_URL must use HTTPS in production")
         if self.catalogue_generation_provider == "gemini" and (
             self.gemini_api_key is None or not self.gemini_api_key.get_secret_value().strip()
         ):

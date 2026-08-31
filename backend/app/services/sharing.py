@@ -31,7 +31,8 @@ from app.schemas.sharing import (
     PublicShareCard,
 )
 from app.services.auth import UserRecord
-from app.storage.local import LocalMediaStorage, get_media_storage
+from app.storage.base import MediaStorage
+from app.storage.factory import create_media_storage, get_media_storage
 
 
 class SharingService:
@@ -39,11 +40,11 @@ class SharingService:
         self,
         settings: Settings,
         database: Database | None = None,
-        storage: LocalMediaStorage | None = None,
+        storage: MediaStorage | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
-        self.storage = storage or get_media_storage()
+        self.storage = storage or create_media_storage(settings)
         self._lock = self.database.write_lock
 
     def approve_draft(

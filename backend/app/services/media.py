@@ -31,7 +31,9 @@ from app.schemas.catalog import (
 )
 from app.schemas.operations import OperationResponse
 from app.services.auth import UserRecord
-from app.storage.local import LocalMediaStorage, get_media_storage
+from app.services.media_urls import refresh_draft_image_urls, refresh_image_urls
+from app.storage.base import MediaStorage
+from app.storage.factory import create_media_storage, get_media_storage
 
 IMAGE_FORMATS = {
     "JPEG": ("image/jpeg", "jpg"),
@@ -45,11 +47,11 @@ class MediaService:
         self,
         settings: Settings,
         database: Database | None = None,
-        storage: LocalMediaStorage | None = None,
+        storage: MediaStorage | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
-        self.storage = storage or get_media_storage()
+        self.storage = storage or create_media_storage(settings)
         self._lock = self.database.write_lock
 
     def upload_image(
@@ -74,7 +76,9 @@ class MediaService:
                     if replay is not None and ensure_utc(replay.expires_at) > now:
                         if replay.request_hash != request_hash:
                             raise self._idempotency_conflict()
-                        return DraftImage.model_validate(replay.response_payload)
+                        image = DraftImage.model_validate(replay.response_payload)
+                        media = session.get(MediaObject, image.id)
+                        return refresh_image_urls(image, media, self.storage)
                     if replay is not None:
                         session.delete(replay)
                         session.flush()
@@ -428,7 +432,7 @@ class MediaService:
                 if current is None:
                     raise ApiError(404, "NOT_FOUND", "The draft was not found.")
                 raise self._version_conflict(current)
-            return updated
+            return refresh_draft_image_urls(session, updated, self.storage)
 
     def get_operation(self, user: UserRecord, operation_id: str) -> OperationResponse:
         with self.database.session() as session:

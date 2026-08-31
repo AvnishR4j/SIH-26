@@ -38,7 +38,8 @@ from app.services.catalogue_generation import (
     get_catalogue_generator,
 )
 from app.services.speech import SpeechTranscriber, get_speech_transcriber
-from app.storage.local import LocalMediaStorage, get_media_storage
+from app.storage.base import MediaStorage
+from app.storage.factory import create_media_storage, get_media_storage
 
 AUDIO_FORMATS = {
     "wav": ("audio/wav", "wav"),
@@ -56,13 +57,13 @@ class VoiceService:
         self,
         settings: Settings,
         database: Database | None = None,
-        storage: LocalMediaStorage | None = None,
+        storage: MediaStorage | None = None,
         transcriber: SpeechTranscriber | None = None,
         catalogue_generator: CatalogueGenerator | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
-        self.storage = storage or get_media_storage()
+        self.storage = storage or create_media_storage(settings)
         self.transcriber = transcriber or get_speech_transcriber()
         self.catalogue_generator = catalogue_generator or get_catalogue_generator()
         self._lock = self.database.write_lock
