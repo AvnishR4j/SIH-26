@@ -240,14 +240,9 @@ class SharingService:
             next_cursor = None
             if len(rows) > limit:
                 last = page[-1]
-                next_cursor = self._encode_marketplace_cursor(
-                    ensure_utc(last.created_at), last.id
-                )
+                next_cursor = self._encode_marketplace_cursor(ensure_utc(last.created_at), last.id)
             return MarketplaceCataloguePage(
-                items=[
-                    self._marketplace_catalogue(row)
-                    for row in page
-                ],
+                items=[self._marketplace_catalogue(row) for row in page],
                 next_cursor=next_cursor,
             )
 
