@@ -83,6 +83,8 @@ abstract interface class ApiClient {
     required String idempotencyKey,
   });
 
+  Future<ApprovedCatalogue> getPublishedCatalogue(String draftId);
+
   Future<ShareCard> getShareCard(String publicShareId);
 
   Future<BuyerEnquiry> submitEnquiry(

@@ -430,6 +430,18 @@ class MockApiClient implements ApiClient {
   }
 
   @override
+  Future<ApprovedCatalogue> getPublishedCatalogue(String draftId) async {
+    await _latency();
+    for (final catalogue in _approvals.values) {
+      if (catalogue.draftId == draftId) return catalogue;
+    }
+    throw const ApiException(
+      code: 'NOT_FOUND',
+      message: 'Published catalogue not found.',
+    );
+  }
+
+  @override
   Future<ShareCard> getShareCard(String publicShareId) async {
     await _latency();
     final card = _shareCards[publicShareId];

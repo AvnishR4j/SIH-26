@@ -239,6 +239,28 @@ def test_approval_creates_immutable_snapshot_and_public_safe_card() -> None:
     assert client.get(f"/api/v1/share/{approved['public_share_id']}").json() == card
 
 
+def test_owner_can_reopen_published_catalogue_but_other_users_cannot() -> None:
+    headers = login_headers()
+    draft = prepare_ready_draft(headers)
+    approved = approve(headers, draft["id"]).json()
+
+    reopened = client.get(
+        f"/api/v1/catalog/drafts/{draft['id']}/published",
+        headers=headers,
+    )
+
+    assert reopened.status_code == 200
+    assert reopened.json() == approved
+
+    other_headers = login_headers("+918888888888")
+    forbidden = client.get(
+        f"/api/v1/catalog/drafts/{draft['id']}/published",
+        headers=other_headers,
+    )
+    assert forbidden.status_code == 404
+    assert forbidden.json()["error"]["code"] == "NOT_FOUND"
+
+
 def test_approval_replay_is_stable_and_changed_request_conflicts() -> None:
     headers = login_headers()
     draft = prepare_ready_draft(headers)
