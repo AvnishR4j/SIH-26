@@ -14,8 +14,9 @@ from app.core.errors import ApiError
 from app.db.models import CatalogDraft, Operation, VoiceMedia
 from app.db.session import get_database
 from app.main import app
-from app.schemas.catalog import GenerateListingRequest
+from app.schemas.catalog import GenerateListingRequest, Listing, ProductFields
 from app.services.auth import get_auth_service
+from app.services.catalogue_generation import CatalogueGenerationResult
 from app.services.speech import TranscriptionResult
 from app.services.voice import VoiceService, get_voice_service
 from app.storage.local import get_media_storage
@@ -35,6 +36,38 @@ class FakeTranscriber:
         return TranscriptionResult(
             text="यह हाथ से बना हुआ कपड़े का उत्पाद है।",
             language="hi",
+        )
+
+
+class FakeCatalogueGenerator:
+    def generate(
+        self,
+        draft: object,
+        transcript: str,
+        source_language: str,
+        target_languages: list[str],
+    ) -> CatalogueGenerationResult:
+        del draft, transcript, source_language, target_languages
+        return CatalogueGenerationResult(
+            fields=ProductFields(
+                product_type="dupatta",
+                material="cotton",
+                technique=None,
+                color=None,
+                dimensions=None,
+                quantity_available=3,
+                production_time_days=None,
+                care=None,
+                origin=None,
+            ),
+            listing=Listing(
+                title_hi="कॉटन दुपट्टा",
+                title_en="Cotton Dupatta",
+                description_hi="हाथ से बना कॉटन दुपट्टा।",
+                description_en="A handmade cotton dupatta.",
+                tags=["textile", "cotton", "dupatta"],
+            ),
+            field_confidence={"product_type": 0.94, "material": 0.9},
         )
 
 
@@ -345,12 +378,51 @@ def test_generation_retry_rechecks_replay_after_draft_lock(
     assert calls == 2
 
 
+def test_generation_provider_result_flows_through_frozen_draft_contract() -> None:
+    headers = login_headers()
+    draft = create_draft(headers)
+    draft_id = str(draft["id"])
+    confirmed = client.patch(
+        f"/api/v1/catalog/drafts/{draft_id}",
+        headers=headers,
+        json={"version": draft["version"], "fields": {"material": "silk"}},
+    )
+    assert confirmed.status_code == 200
+    image = upload_image(headers, draft_id)
+    voice = upload_voice(headers, draft_id).json()
+    accept_consent(headers)
+    service = app.dependency_overrides[get_voice_service]()
+    service.catalogue_generator = FakeCatalogueGenerator()
+
+    started = client.post(
+        f"/api/v1/catalog/drafts/{draft_id}/generate-listing",
+        headers={**headers, "Idempotency-Key": str(uuid4())},
+        json={
+            "voice_note_id": voice["id"],
+            "image_id": image["id"],
+            "target_languages": ["hi", "en"],
+        },
+    )
+
+    assert started.status_code == 202
+    operation = client.get(started.headers["location"], headers=headers).json()
+    updated = client.get(f"/api/v1/catalog/drafts/{draft_id}", headers=headers).json()
+    assert operation["status"] == "succeeded"
+    assert updated["fields"]["product_type"] == "dupatta"
+    assert updated["fields"]["material"] == "silk"
+    assert updated["fields"]["quantity_available"] == 3
+    assert updated["listing"]["title_en"] == "Cotton Dupatta"
+    assert updated["field_confidence"] == {"product_type": 0.94}
+    assert "product_type" not in updated["missing_fields"]
+    assert "technique" in updated["missing_fields"]
+
+
 def test_generation_failure_is_persisted_for_polling(
     voice_service_override: FakeTranscriber,
 ) -> None:
     voice_service_override.error = ApiError(
         503,
-        "SPEECH_PROVIDER_UNAVAILABLE",
+        "AI_SERVICE_UNAVAILABLE",
         "Local speech transcription is temporarily unavailable.",
     )
     headers = login_headers()
@@ -373,9 +445,9 @@ def test_generation_failure_is_persisted_for_polling(
     operation = client.get(started.headers["location"], headers=headers).json()
     updated = client.get(f"/api/v1/catalog/drafts/{draft_id}", headers=headers).json()
     assert operation["status"] == "failed"
-    assert operation["error"]["code"] == "SPEECH_PROVIDER_UNAVAILABLE"
+    assert operation["error"]["code"] == "AI_SERVICE_UNAVAILABLE"
     assert updated["status"] == "failed"
-    assert updated["last_processing_error"]["code"] == "SPEECH_PROVIDER_UNAVAILABLE"
+    assert updated["last_processing_error"]["code"] == "AI_SERVICE_UNAVAILABLE"
 
 
 def test_generation_rejects_missing_media_duplicate_work_and_approved_draft() -> None:

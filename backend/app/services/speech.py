@@ -41,13 +41,13 @@ class FasterWhisperTranscriber:
         except Exception as error:
             raise ApiError(
                 503,
-                "SPEECH_PROVIDER_UNAVAILABLE",
+                "AI_SERVICE_UNAVAILABLE",
                 "Local speech transcription is temporarily unavailable.",
             ) from error
         if not text:
             raise ApiError(
                 422,
-                "TRANSCRIPTION_EMPTY",
+                "VALIDATION_ERROR",
                 "No clear speech was detected in the voice note.",
             )
         return TranscriptionResult(text=text, language=language)

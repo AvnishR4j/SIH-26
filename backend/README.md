@@ -89,11 +89,18 @@ remaining practical on a development laptop. The first request downloads the
 model into `WHISPER_MODEL_CACHE_DIR`; pre-warm that cache while online before a
 demo. Model files are ignored by Git.
 
-The current catalogue-generation provider is intentionally conservative: it
-stores the real transcript and creates only a grounded listing scaffold. It
-does not translate or infer unspoken product facts; missing fields remain
-explicit for artisan confirmation. A later LLM provider can fill those fields
-behind the same frozen HTTP contract.
+`CATALOGUE_GENERATION_PROVIDER=mock` is the default and intentionally creates
+only a grounded listing scaffold. Set it to `gemini` and provide a server-side
+`GEMINI_API_KEY` to use the optional Gemini catalogue provider behind the same
+frozen endpoint. The key is never accepted from or returned to Flutter.
+
+Gemini output is parsed against a strict schema. Every extracted product field
+must include a verbatim transcript evidence span; unsupported candidates and
+generated contact details are discarded. Existing artisan values always win,
+unknown fields remain explicit in `missing_fields`, generated values retain
+confidence scores, and the draft still requires artisan confirmation and
+approval. The provider model defaults to stable `gemini-2.5-flash` and can be
+changed through `GEMINI_MODEL` without changing the HTTP contract.
 
 ## Explainable pricing
 
