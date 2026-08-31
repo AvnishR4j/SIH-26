@@ -23,7 +23,7 @@ class RealApiClient implements ApiClient {
       _headers(request, auth, key);
       request.headers.contentType = ContentType.json;
       if (body != null) request.write(jsonEncode(body));
-      return _response(request);
+      return await _response(request);
     } on SocketException {
       throw const ApiException(code: 'NETWORK_ERROR', message: 'Could not reach KalaSetu. Check the network and try again.');
     } on HttpException {
@@ -44,7 +44,7 @@ class RealApiClient implements ApiClient {
       request.write('--$boundary\r\nContent-Disposition: form-data; name="$field"; filename="$name"\r\nContent-Type: ${file.mimeType}\r\n\r\n');
       request.add(await File(file.path).readAsBytes());
       request.write('\r\n--$boundary--\r\n');
-      return _response(request);
+      return await _response(request);
     } on FileSystemException {
       throw const ApiException(code: 'MEDIA_UNAVAILABLE', message: 'The selected media file is no longer available.');
     }
@@ -87,7 +87,7 @@ class RealApiClient implements ApiClient {
   ArtisanProfile _profile(Map<String, dynamic> v) { final c = (v['consent'] as Map).cast<String, dynamic>(); return ArtisanProfile(id: v['id'] as String, name: v['name'] as String, phone: v['phone'] as String, role: v['role'] as String, preferredLanguage: v['preferred_language'] as String, cluster: v['cluster'] as String?, craftCategories: _s(v['craft_categories']), consent: MediaProcessingConsent(accepted: c['media_processing_accepted'] as bool, acceptedAt: c['media_processing_accepted_at'] == null ? null : _d(c['media_processing_accepted_at']), policyVersion: c['policy_version'] as String)); }
   @override Future<ArtisanProfile> updateMe(UpdateProfileInput x) async => _profile(await _request('PATCH', 'me', body: {'name':x.name,'preferred_language':x.preferredLanguage,'cluster':x.cluster,'craft_categories':x.craftCategories}));
   @override Future<MediaProcessingConsent> setMediaProcessingConsent(SetMediaConsentInput x) async { final v=await _request('PUT','me/consents/media-processing',body:{'accepted':x.accepted,'policy_version':x.policyVersion}); return MediaProcessingConsent(accepted:v['media_processing_accepted'] as bool,acceptedAt:v['media_processing_accepted_at']==null?null:_d(v['media_processing_accepted_at']),policyVersion:v['policy_version'] as String); }
-  @override Future<DraftPage> listDrafts({int limit=20,String? cursor,String? status}) async { final q={'limit':'$limit',if(cursor!=null)'cursor':cursor,if(status!=null)'status':status}; final v=await _request('GET','catalog/drafts',query:q); return DraftPage(items:(v['items'] as List).map((x){final m=(x as Map).cast<String,dynamic>();return DraftSummary(id:m['id'] as String,version:_i(m['version']),status:m['status'] as String,titleHi:m['title_hi'] as String?,titleEn:m['title_en'] as String?,thumbnailUrl:m['thumbnail_url'] as String?,recommendedPricePaise:m['recommended_price_paise']==null?null:_i(m['recommended_price_paise']),updatedAt:_d(m['updated_at']));}).toList(),nextCursor:v['next_cursor'] as String?); }
+  @override Future<DraftPage> listDrafts({int limit=20,String? cursor,String? status}) async { final q={'limit':'$limit',...? (cursor == null ? null : {'cursor':cursor}),...? (status == null ? null : {'status':status})}; final v=await _request('GET','catalog/drafts',query:q); return DraftPage(items:(v['items'] as List).map((x){final m=(x as Map).cast<String,dynamic>();return DraftSummary(id:m['id'] as String,version:_i(m['version']),status:m['status'] as String,titleHi:m['title_hi'] as String?,titleEn:m['title_en'] as String?,thumbnailUrl:m['thumbnail_url'] as String?,recommendedPricePaise:m['recommended_price_paise']==null?null:_i(m['recommended_price_paise']),updatedAt:_d(m['updated_at']));}).toList(),nextCursor:v['next_cursor'] as String?); }
   @override Future<CatalogueDraft> createDraft(CreateDraftInput x,{required String idempotencyKey}) async=>_draft(await _request('POST','catalog/drafts',body:{'craft_category':x.craftCategory,'source_language':x.sourceLanguage,'initial_notes':x.initialNotes},key:idempotencyKey));
   @override Future<CatalogueDraft> getDraft(String id) async=>_draft(await _request('GET','catalog/drafts/$id'));
   @override Future<CatalogueDraft> updateDraft(String id,UpdateDraftInput x) async=>_draft(await _request('PATCH','catalog/drafts/$id',body:{'version':x.version,'fields':{'product_type':x.fields.productType,'material':x.fields.material,'technique':x.fields.technique,'color':x.fields.color,'dimensions':x.fields.dimensions,'quantity_available':x.fields.quantityAvailable,'production_time_days':x.fields.productionTimeDays,'care':x.fields.care,'origin':x.fields.origin}..removeWhere((k,v)=>v==null),'listing':{'title_hi':x.listing.titleHi,'title_en':x.listing.titleEn,'description_hi':x.listing.descriptionHi,'description_en':x.listing.descriptionEn,'tags':x.listing.tags}}));
