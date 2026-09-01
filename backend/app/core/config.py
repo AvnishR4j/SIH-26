@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     app_name: str = "KalaSetu API"
     app_version: str = "0.1.0"
-    environment: Literal["development", "test", "production"] = "development"
+    environment: Literal["development", "test", "demo", "production"] = "development"
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     otp_idempotency_ttl_seconds: int = 60
     idempotency_ttl_seconds: int = 86400
     admin_phone_e164: str | None = None
+    demo_otp_allowed_phone_e164s: list[str] = Field(default_factory=list)
     enquiry_max_per_hour_per_buyer: int = Field(default=5, ge=1, le=100)
     dev_otp: str | None = "123456"
     media_consent_policy_version: str = "2026-08-29"
@@ -102,6 +103,18 @@ class Settings(BaseSettings):
             raise ValueError("ADMIN_PHONE_E164 must be an E.164 phone number.")
         return normalized
 
+    @field_validator("demo_otp_allowed_phone_e164s")
+    @classmethod
+    def validate_demo_phone_allowlist(cls, values: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for value in values:
+            phone = value.strip()
+            if re.fullmatch(r"\+[1-9]\d{7,14}", phone) is None:
+                raise ValueError("Demo OTP phone numbers must use E.164 format.")
+            if phone not in normalized:
+                normalized.append(phone)
+        return normalized
+
     @field_validator("public_api_base_url", "public_share_web_base_url")
     @classmethod
     def validate_public_url(cls, value: str) -> str:
@@ -130,31 +143,36 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
+        hosted_environment = self.environment in {"demo", "production"}
         if self.environment == "production" and self.dev_otp is not None:
             raise ValueError("DEV_OTP must be unset in production")
-        if self.environment == "production" and (
+        if self.environment == "demo" and self.dev_otp is None:
+            raise ValueError("DEV_OTP is required in demo mode")
+        if self.environment == "demo" and not self.demo_otp_allowed_phone_e164s:
+            raise ValueError("DEMO_OTP_ALLOWED_PHONE_E164S is required in demo mode")
+        if hosted_environment and (
             "development-only" in self.jwt_secret or "CHANGE_ME" in self.jwt_secret
         ):
-            raise ValueError("JWT_SECRET must be replaced in production")
-        if self.environment == "production" and len(self.jwt_secret) < 32:
-            raise ValueError("JWT_SECRET must contain at least 32 characters in production")
-        if self.environment == "production" and self.database_auto_create:
+            raise ValueError("JWT_SECRET must be replaced in hosted environments")
+        if hosted_environment and len(self.jwt_secret) < 32:
             raise ValueError(
-                "DATABASE_AUTO_CREATE must be false in production; run migrations instead"
+                "JWT_SECRET must contain at least 32 characters in hosted environments"
             )
-        if self.environment == "production" and not self.media_url_base.startswith("https://"):
-            raise ValueError("MEDIA_URL_BASE must use HTTPS in production")
-        if self.environment == "production" and not self.public_share_web_base_url.startswith(
-            "https://"
-        ):
-            raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must use HTTPS in production")
-        if self.environment == "production" and not self.public_api_base_url.startswith("https://"):
-            raise ValueError("PUBLIC_API_BASE_URL must use HTTPS in production")
-        if self.environment == "production" and any(
+        if hosted_environment and self.database_auto_create:
+            raise ValueError(
+                "DATABASE_AUTO_CREATE must be false in hosted environments; run migrations instead"
+            )
+        if hosted_environment and not self.media_url_base.startswith("https://"):
+            raise ValueError("MEDIA_URL_BASE must use HTTPS in hosted environments")
+        if hosted_environment and not self.public_share_web_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_SHARE_WEB_BASE_URL must use HTTPS in hosted environments")
+        if hosted_environment and not self.public_api_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_API_BASE_URL must use HTTPS in hosted environments")
+        if hosted_environment and any(
             not origin.startswith("https://") for origin in self.cors_origins
         ):
-            raise ValueError("CORS_ORIGINS must use HTTPS in production")
-        if self.environment == "production" and self.media_storage == "local":
+            raise ValueError("CORS_ORIGINS must use HTTPS in hosted environments")
+        if hosted_environment and self.media_storage == "local":
             raise ValueError(
                 "MEDIA_STORAGE=local is development-only; configure private object storage"
             )
@@ -171,7 +189,7 @@ class Settings(BaseSettings):
             and self.supabase_private_bucket == self.supabase_public_bucket
         ):
             raise ValueError("Supabase private and public buckets must be different")
-        if self.environment == "production" and self.media_storage == "supabase":
+        if hosted_environment and self.media_storage == "supabase":
             assert self.supabase_url is not None
             if not self.supabase_url.startswith("https://"):
                 raise ValueError("SUPABASE_URL must use HTTPS in production")

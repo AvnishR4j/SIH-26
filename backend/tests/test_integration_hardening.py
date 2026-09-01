@@ -67,6 +67,29 @@ def test_production_rejects_development_otp_and_short_jwt_secret() -> None:
         settings(environment="production", jwt_secret="too-short", dev_otp=None)
 
 
+def test_demo_requires_an_invited_phone_allowlist() -> None:
+    secure_demo = {
+        "environment": "demo",
+        "jwt_secret": "x" * 32,
+        "dev_otp": "123456",
+        "database_auto_create": False,
+        "media_storage": "supabase",
+        "media_url_base": "https://media.example.test",
+        "public_api_base_url": "https://api.example.test",
+        "public_share_web_base_url": "https://share.example.test",
+        "cors_origins": ["https://app.example.test"],
+        "supabase_url": "https://project.supabase.co",
+        "supabase_secret_key": "secret",
+    }
+    with pytest.raises(ValidationError, match="DEMO_OTP_ALLOWED_PHONE_E164S"):
+        settings(**secure_demo)
+    configured = settings(**{**secure_demo, "demo_otp_allowed_phone_e164s": ["+919999999999"]})
+    service = AuthService(configured)
+    with pytest.raises(ApiError) as error:
+        service.request_otp("+918888888888", str(uuid4()))
+    assert error.value.code == "DEMO_ACCESS_RESTRICTED"
+
+
 def test_production_rejects_local_media_and_insecure_public_origins() -> None:
     secure = {
         "environment": "production",

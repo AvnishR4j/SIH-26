@@ -1,0 +1,79 @@
+services:
+  - type: web
+    name: kalasetu-api
+    runtime: python
+    region: singapore
+    plan: 1c-2g
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic -c alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
+    disk:
+      name: model-cache
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: ENVIRONMENT
+        value: demo
+      - key: DATABASE_AUTO_CREATE
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "[]"
+      - key: MEDIA_STORAGE
+        value: supabase
+      - key: IMAGE_ENHANCEMENT_PROVIDER
+        value: rembg
+      - key: REMBG_MODEL
+        value: u2netp
+      - key: REMBG_MODEL_CACHE_DIR
+        value: /var/data/rembg
+      - key: SPEECH_PROVIDER
+        value: faster_whisper
+      - key: WHISPER_MODEL_SIZE
+        value: medium
+      - key: WHISPER_DEVICE
+        value: cpu
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: WHISPER_CPU_THREADS
+        value: "4"
+      - key: WHISPER_BEAM_SIZE
+        value: "8"
+      - key: WHISPER_VAD_MIN_SILENCE_MS
+        value: "500"
+      - key: WHISPER_MODEL_CACHE_DIR
+        value: /var/data/faster-whisper
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEV_OTP
+        sync: false
+      - key: DEMO_OTP_ALLOWED_PHONE_E164S
+        sync: false
+      - key: ADMIN_PHONE_E164
+        sync: false
+      - key: PUBLIC_API_BASE_URL
+        fromService:
+          type: web
+          name: kalasetu-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: PUBLIC_SHARE_WEB_BASE_URL
+        fromService:
+          type: web
+          name: kalasetu-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: MEDIA_URL_BASE
+        fromService:
+          type: web
+          name: kalasetu-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

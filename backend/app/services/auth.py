@@ -86,6 +86,15 @@ class AuthService:
                 "SERVICE_UNAVAILABLE",
                 "OTP delivery is temporarily unavailable.",
             )
+        if (
+            self.settings.environment == "demo"
+            and phone not in self.settings.demo_otp_allowed_phone_e164s
+        ):
+            raise ApiError(
+                403,
+                "DEMO_ACCESS_RESTRICTED",
+                "This demo is limited to approved phone numbers.",
+            )
         now = datetime.now(UTC)
         with self._lock:
             try:
