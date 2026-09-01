@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/localization/app_language.dart';
@@ -28,6 +29,11 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
+  static const _storefrontUrl = String.fromEnvironment(
+    'SHOPIFY_STOREFRONT_URL',
+    defaultValue: 'https://ngbarh-1m.myshopify.com',
+  );
+
   List<MarketplaceCatalogue> _items = const [];
   String? _nextCursor;
   bool _loading = true;
@@ -99,6 +105,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ),
       );
+
+  Future<void> _openStorefront() async {
+    final opened = await launchUrl(
+      Uri.parse(_storefrontUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t('स्टोर खोलने में समस्या हुई', 'Could not open the KalaSetu Store'),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _delete(MarketplaceCatalogue catalogue) async {
     final confirmed = await showDialog<bool>(
@@ -193,6 +215,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
               'Published catalogues from artisans',
             ),
             style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('visitKalaSetuStoreButton'),
+              onPressed: _openStorefront,
+              icon: const Icon(Icons.open_in_new),
+              label: Text(_t('कला सेतु स्टोर देखें', 'Visit KalaSetu Store')),
+            ),
           ),
           const SizedBox(height: 20),
           if (_items.isEmpty)
