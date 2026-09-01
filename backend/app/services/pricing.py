@@ -13,6 +13,7 @@ from app.core.errors import ApiError
 from app.db.base import ensure_utc
 from app.db.models import (
     CatalogDraft,
+    MaterialRate as MaterialRateRow,
     Operation,
     PricingBenchmark,
     PricingSuggestionIdempotency,
@@ -20,6 +21,8 @@ from app.db.models import (
 from app.db.session import Database, get_database
 from app.schemas.catalog import (
     Draft,
+    MaterialRate,
+    MaterialRateUpdate,
     PricingBreakdown,
     PricingSuggestion,
     PricingSuggestionRequest,
@@ -91,6 +94,10 @@ class PricingService:
                         draft.version + 1,
                         request,
                         benchmark,
+                        material=request.material or draft.fields.material,
+                        material_rate=self._find_material_rate(
+                            session, request.material or draft.fields.material
+                        ),
                         fallback_category=fallback_category,
                     )
                     updated = draft.model_copy(
@@ -127,6 +134,44 @@ class PricingService:
                     now,
                 )
 
+    def list_material_rates(self, user: UserRecord) -> list[MaterialRate]:
+        with self.database.session() as session:
+            rows = session.scalars(
+                select(MaterialRateRow).order_by(MaterialRateRow.material)
+            ).all()
+            return [self._material_rate(row) for row in rows]
+
+    def update_material_rate(
+        self,
+        user: UserRecord,
+        material: str,
+        request: MaterialRateUpdate,
+    ) -> MaterialRate:
+        if user.role != "admin":
+            raise ApiError(403, "FORBIDDEN", "Only an admin can update material rates.")
+        normalized = self._normalize_material(material)
+        with self._lock:
+            with self.database.session() as session, session.begin():
+                row = session.get(MaterialRateRow, normalized)
+                if row is None:
+                    row = MaterialRateRow(
+                        material=normalized,
+                        unit=request.unit,
+                        rate_paise_per_unit=request.rate_paise_per_unit,
+                        source_label=request.source_label,
+                        source_date=request.source_date,
+                        is_demo_data=request.is_demo_data,
+                    )
+                    session.add(row)
+                else:
+                    row.unit = request.unit
+                    row.rate_paise_per_unit = request.rate_paise_per_unit
+                    row.source_label = request.source_label
+                    row.source_date = request.source_date
+                    row.is_demo_data = request.is_demo_data
+                session.flush()
+                return self._material_rate(row)
+
     @staticmethod
     def _calculate(
         draft_id: str,
@@ -134,6 +179,8 @@ class PricingService:
         request: PricingSuggestionRequest,
         benchmark: PricingBenchmark,
         *,
+        material: str | None,
+        material_rate: MaterialRateRow | None,
         fallback_category: str | None = None,
     ) -> PricingSuggestion:
         labour_cost = int(
@@ -197,6 +244,16 @@ class PricingService:
             reasons.append(
                 f"No exact benchmark exists for '{fallback_category}', so a generic handicraft reference band was used."
             )
+        if material_rate is not None:
+            rendered_rate = Decimal(material_rate.rate_paise_per_unit) / Decimal(100)
+            reasons.append(
+                f"The latest recorded {material_rate.material} rate is ₹{rendered_rate:g} per "
+                f"{material_rate.unit}, dated {material_rate.source_date.isoformat()}."
+            )
+            if material_rate.is_demo_data:
+                reasons.append(
+                    "The material-rate record is demo data and must be replaced with a verified source."
+                )
         if confidence == "low":
             reasons.append(
                 "Confidence is low because the cost inputs and benchmark band do not align closely."
@@ -222,7 +279,39 @@ class PricingService:
             benchmark_source_label=benchmark.source_label,
             benchmark_source_date=benchmark.source_date,
             is_demo_data=benchmark.is_demo_data,
+            material=material,
+            material_rate=(
+                PricingService._material_rate(material_rate)
+                if material_rate is not None
+                else None
+            ),
         )
+
+    @staticmethod
+    def _normalize_material(value: str) -> str:
+        normalized = "_".join(value.strip().lower().split())
+        if not normalized or len(normalized) > 80:
+            raise ApiError(422, "VALIDATION_ERROR", "Material name is invalid.")
+        return normalized
+
+    @staticmethod
+    def _material_rate(row: MaterialRateRow) -> MaterialRate:
+        return MaterialRate(
+            material=row.material,
+            unit=row.unit,
+            rate_paise_per_unit=row.rate_paise_per_unit,
+            source_label=row.source_label,
+            source_date=row.source_date,
+            is_demo_data=row.is_demo_data,
+        )
+
+    @classmethod
+    def _find_material_rate(
+        cls, session: Session, material: str | None
+    ) -> MaterialRateRow | None:
+        if material is None:
+            return None
+        return session.get(MaterialRateRow, cls._normalize_material(material))
 
     @staticmethod
     def _round_up_ratio(value: int, numerator: int, denominator: int) -> int:

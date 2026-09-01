@@ -260,6 +260,23 @@ class PricingBenchmark(Base):
     is_demo_data: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
+class MaterialRate(Base):
+    """A dated per-unit material rate used by the dynamic-pricing refresh."""
+
+    __tablename__ = "material_rates"
+    __table_args__ = (CheckConstraint("rate_paise_per_unit >= 0", name="rate_non_negative"),)
+
+    material: Mapped[str] = mapped_column(String(80), primary_key=True)
+    unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    rate_paise_per_unit: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_label: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_demo_data: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
 class PricingSuggestionIdempotency(Base):
     __tablename__ = "pricing_suggestion_idempotency"
     __table_args__ = (UniqueConstraint("owner_id", "idempotency_key"),)

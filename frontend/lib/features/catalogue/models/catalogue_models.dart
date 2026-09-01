@@ -295,6 +295,7 @@ class PriceSuggestionInput {
     required this.packagingCostPaise,
     required this.logisticsBufferPaise,
     required this.benchmarkCategory,
+    this.material,
   });
 
   final int version;
@@ -304,6 +305,7 @@ class PriceSuggestionInput {
   final int packagingCostPaise;
   final int logisticsBufferPaise;
   final String benchmarkCategory;
+  final String? material;
 }
 
 class PriceBreakdown {
@@ -340,6 +342,8 @@ class PricingSuggestion {
     required this.benchmarkSourceLabel,
     required this.benchmarkSourceDate,
     required this.isDemoData,
+    this.material,
+    this.materialRate,
   });
 
   final String draftId;
@@ -353,6 +357,26 @@ class PricingSuggestion {
   final String benchmarkCategory;
   final String benchmarkSourceLabel;
   final DateTime benchmarkSourceDate;
+  final bool isDemoData;
+  final String? material;
+  final MaterialRate? materialRate;
+}
+
+class MaterialRate {
+  const MaterialRate({
+    required this.material,
+    required this.unit,
+    required this.ratePaisePerUnit,
+    required this.sourceLabel,
+    required this.sourceDate,
+    required this.isDemoData,
+  });
+
+  final String material;
+  final String unit;
+  final int ratePaisePerUnit;
+  final String sourceLabel;
+  final DateTime sourceDate;
   final bool isDemoData;
 }
 

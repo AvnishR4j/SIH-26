@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 from threading import Barrier
 from typing import Any
 from uuid import uuid4
@@ -11,7 +12,8 @@ from sqlalchemy import select
 from app.db.models import CatalogDraft
 from app.db.session import get_database
 from app.main import app
-from app.services.auth import get_auth_service
+from app.schemas.catalog import MaterialRateUpdate
+from app.services.auth import UserRecord, get_auth_service
 from app.services.catalog import get_catalog_service
 from app.services.pricing import get_pricing_service
 
@@ -257,6 +259,39 @@ def test_pricing_does_not_reveal_another_users_draft() -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_material_rates_are_dated_and_only_an_admin_can_update() -> None:
+    service = get_pricing_service()
+    artisan = UserRecord(id="artisan", phone="+919999999999")
+    admin = UserRecord(id="admin", phone="+918888888888", role="admin")
+    update = MaterialRateUpdate(
+        unit="kg",
+        rate_paise_per_unit=6_250,
+        source_label="Verified supplier quotation",
+        source_date=date(2026, 9, 1),
+    )
+
+    with pytest.raises(Exception) as forbidden:
+        service.update_material_rate(artisan, "glass", update)
+    assert getattr(forbidden.value, "code") == "FORBIDDEN"
+
+    stored = service.update_material_rate(admin, " Glass ", update)
+    assert stored.material == "glass"
+    assert stored.rate_paise_per_unit == 6_250
+    assert stored.source_date == date(2026, 9, 1)
+    assert service.list_material_rates(artisan) == [stored]
+
+    headers = login_headers()
+    draft = create_draft(headers)
+    suggestion = suggest(headers, draft["id"], pricing_payload(material="Glass"))
+
+    assert suggestion.status_code == 200
+    context = suggestion.json()["material_rate"]
+    assert suggestion.json()["material"] == "glass"
+    assert context["rate_paise_per_unit"] == 6_250
+    assert context["unit"] == "kg"
+    assert any("glass rate" in reason for reason in suggestion.json()["reasons"])
 
 
 def test_edit_after_pricing_makes_the_suggestion_stale() -> None:

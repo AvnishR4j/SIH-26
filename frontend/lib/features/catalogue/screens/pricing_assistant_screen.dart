@@ -82,6 +82,7 @@ class _PricingAssistantScreenState extends State<PricingAssistantScreen> {
           benchmarkCategory:
               widget.controller.state.draft.fields.productType ??
               widget.controller.state.draft.craftCategory,
+          material: widget.controller.state.draft.fields.material,
         ),
       );
       if (mounted) {
@@ -252,6 +253,15 @@ class _PricingAssistantScreenState extends State<PricingAssistantScreen> {
             '${suggestion.benchmarkSourceLabel} · ${suggestion.benchmarkSourceDate.toIso8601String().substring(0, 10)}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          if (suggestion.materialRate case final materialRate?) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${_t('सामग्री दर', 'Material rate')}: '
+              '${Money.formatPaise(materialRate.ratePaisePerUnit, decimals: false)} '
+              '/ ${materialRate.unit} · ${materialRate.sourceLabel}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           if (suggestion.isDemoData)
             Padding(
               padding: const EdgeInsets.only(top: 8),

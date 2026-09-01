@@ -190,8 +190,21 @@ class RealApiClient implements ApiClient {
       benchmarkSourceLabel: v['benchmark_source_label'] as String,
       benchmarkSourceDate: _d(v['benchmark_source_date']),
       isDemoData: v['is_demo_data'] as bool,
+      material: v['material'] as String?,
+      materialRate: v['material_rate'] is Map
+          ? _materialRate((v['material_rate'] as Map).cast<String, dynamic>())
+          : null,
     );
   }
+
+  MaterialRate _materialRate(Map<String, dynamic> v) => MaterialRate(
+    material: v['material'] as String,
+    unit: v['unit'] as String,
+    ratePaisePerUnit: _i(v['rate_paise_per_unit']),
+    sourceLabel: v['source_label'] as String,
+    sourceDate: _d(v['source_date']),
+    isDemoData: v['is_demo_data'] as bool,
+  );
 
   CatalogueDraft _draft(Map<String, dynamic> v) => CatalogueDraft(
     id: v['id'] as String,
@@ -515,6 +528,7 @@ class RealApiClient implements ApiClient {
         'packaging_cost_paise': x.packagingCostPaise,
         'logistics_buffer_paise': x.logisticsBufferPaise,
         'benchmark_category': x.benchmarkCategory,
+        'material': x.material,
       },
       key: idempotencyKey,
     ),

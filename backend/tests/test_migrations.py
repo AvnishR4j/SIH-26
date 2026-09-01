@@ -20,6 +20,7 @@ APPLICATION_TABLES = {
     "voice_media",
     "voice_upload_idempotency",
     "pricing_benchmarks",
+    "material_rates",
     "pricing_suggestion_idempotency",
     "catalog_snapshots",
     "approval_idempotency",

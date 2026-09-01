@@ -22,6 +22,7 @@ from app.db.models import (
     DraftCreateIdempotency,
     EnquiryIdempotency,
     ImageUploadIdempotency,
+    MaterialRate,
     MediaObject,
     Operation,
     OperationIdempotency,
@@ -61,6 +62,7 @@ class AuthService:
     def reset(self) -> None:
         """Clear persisted test data in foreign-key-safe order."""
         with self._lock, self.database.session() as session, session.begin():
+            session.execute(delete(MaterialRate))
             session.execute(delete(EnquiryIdempotency))
             session.execute(delete(BuyerEnquiry))
             session.execute(delete(ApprovalIdempotency))

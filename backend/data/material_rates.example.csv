@@ -1,0 +1,5 @@
+material,unit,rate_rupees_per_unit,source_label,source_date,is_demo_data
+glass,kg,,Verified supplier or licensed market source,YYYY-MM-DD,false
+plastic,kg,,Verified supplier or licensed market source,YYYY-MM-DD,false
+clay,kg,,Verified supplier or licensed market source,YYYY-MM-DD,false
+cotton,meter,,Official or licensed textile price source,YYYY-MM-DD,false

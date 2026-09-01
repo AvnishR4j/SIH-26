@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Literal
 
@@ -167,6 +169,7 @@ class PricingSuggestionRequest(StrictModel):
     packaging_cost_paise: int = Field(ge=0)
     logistics_buffer_paise: int = Field(ge=0)
     benchmark_category: str = Field(min_length=1, max_length=80)
+    material: str | None = Field(default=None, max_length=80)
 
     @field_validator("benchmark_category")
     @classmethod
@@ -175,6 +178,14 @@ class PricingSuggestionRequest(StrictModel):
         if not cleaned:
             raise ValueError("Benchmark category cannot be blank.")
         return cleaned
+
+    @field_validator("material")
+    @classmethod
+    def normalize_material(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = " ".join(value.strip().lower().split())
+        return cleaned or None
 
 
 class PricingSuggestion(StrictModel):
@@ -190,12 +201,39 @@ class PricingSuggestion(StrictModel):
     benchmark_source_label: str
     benchmark_source_date: date
     is_demo_data: bool
+    material: str | None = None
+    material_rate: MaterialRate | None = None
 
     @model_validator(mode="after")
     def validate_suggestion_range(self) -> "PricingSuggestion":
         if not (self.suggested_min_paise <= self.recommended_paise <= self.suggested_max_paise):
             raise ValueError("Recommended price must be inside the suggested range.")
         return self
+
+
+class MaterialRate(StrictModel):
+    material: str
+    unit: str
+    rate_paise_per_unit: int = Field(ge=0)
+    source_label: str
+    source_date: date
+    is_demo_data: bool
+
+
+class MaterialRateUpdate(StrictModel):
+    unit: str = Field(min_length=1, max_length=24)
+    rate_paise_per_unit: int = Field(ge=0)
+    source_label: str = Field(min_length=1, max_length=160)
+    source_date: date
+    is_demo_data: bool = False
+
+    @field_validator("unit", "source_label")
+    @classmethod
+    def clean_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("This field cannot be blank.")
+        return cleaned
 
 
 class DraftCreate(StrictModel):
