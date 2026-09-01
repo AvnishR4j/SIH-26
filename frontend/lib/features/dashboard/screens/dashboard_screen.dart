@@ -563,7 +563,12 @@ class _DraftRow extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: ProductImage(networkUrl: thumbnailUrl, borderRadius: 7),
+                child: ProductImage(
+                  networkUrl: thumbnailUrl,
+                  borderRadius: 7,
+                  cacheWidth: 112,
+                  cacheHeight: 112,
+                ),
               ),
             ),
             const SizedBox(width: 14),

@@ -12,6 +12,8 @@ class ProductImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius = 8,
     this.preferNetwork = false,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   final String? localPath;
@@ -19,6 +21,8 @@ class ProductImage extends StatelessWidget {
   final BoxFit fit;
   final double borderRadius;
   final bool preferNetwork;
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +35,20 @@ class ProductImage extends StatelessWidget {
       ),
     );
     Widget localImage() => local != null && File(local).existsSync()
-        ? Image.file(File(local), fit: fit, errorBuilder: (_, _, _) => fallback)
+        ? Image.file(
+            File(local),
+            fit: fit,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
+            errorBuilder: (_, _, _) => fallback,
+          )
         : fallback;
     Widget networkImage() => network != null && network.isNotEmpty
         ? Image.network(
             network,
             fit: fit,
+            cacheWidth: cacheWidth,
+            cacheHeight: cacheHeight,
             errorBuilder: (_, _, _) => localImage(),
           )
         : localImage();
