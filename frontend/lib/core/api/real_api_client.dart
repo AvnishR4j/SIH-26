@@ -564,6 +564,11 @@ class RealApiClient implements ApiClient {
   }
 
   @override
+  Future<void> syncDraftToShopify(String id) async {
+    await _request('POST', 'catalog/drafts/$id/shopify');
+  }
+
+  @override
   Future<MarketplacePage> listMarketplaceCatalogues({
     int limit = 20,
     String? cursor,

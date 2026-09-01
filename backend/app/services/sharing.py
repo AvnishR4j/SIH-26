@@ -33,8 +33,10 @@ from app.schemas.sharing import (
     MarketplaceCataloguePage,
     PublicArtisan,
     PublicShareCard,
+    ShopifyProductSync,
 )
 from app.services.auth import UserRecord
+from app.services.shopify import ShopifyDraftProduct, ShopifyService, get_shopify_service
 from app.storage.base import MediaStorage
 from app.storage.factory import create_media_storage, get_media_storage
 
@@ -45,10 +47,12 @@ class SharingService:
         settings: Settings,
         database: Database | None = None,
         storage: MediaStorage | None = None,
+        shopify: ShopifyService | None = None,
     ) -> None:
         self.settings = settings
         self.database = database or get_database()
         self.storage = storage or create_media_storage(settings)
+        self.shopify = shopify or get_shopify_service()
         self._lock = self.database.write_lock
 
     def approve_draft(
@@ -230,6 +234,44 @@ class SharingService:
                 ),
                 created_at=ensure_utc(snapshot.created_at),
             )
+
+    def sync_draft_to_shopify(self, user: UserRecord, draft_id: str) -> ShopifyProductSync:
+        """Create one Shopify Draft product from an already approved catalogue."""
+        with self._lock, self.database.session() as session:
+            snapshot = session.scalar(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.draft_id == draft_id,
+                    CatalogSnapshot.owner_id == user.id,
+                    CatalogSnapshot.is_deleted.is_(False),
+                )
+            )
+            if snapshot is None:
+                raise ApiError(404, "NOT_FOUND", "Published catalogue not found.")
+            if snapshot.shopify_product_id is not None:
+                return self._shopify_sync_response(snapshot)
+            row = self._owned_draft_row(session, user.id, draft_id)
+            draft = Draft.model_validate(row.payload)
+            if draft.listing is None:
+                raise ApiError(400, "INVALID_STATE", "The catalogue has no listing details.")
+            image_content = self.storage.read(snapshot.public_image_key)
+            product = ShopifyDraftProduct(
+                title=draft.listing.title_en or draft.listing.title_hi or "KalaSetu product",
+                description_html=self._shopify_description(draft),
+                vendor=user.name,
+                product_type=draft.fields.product_type or draft.craft_category,
+                tags=self._shopify_tags(draft),
+                price_paise=snapshot.approved_price_paise,
+                image_filename=snapshot.public_image_key.rsplit("/", 1)[-1],
+                image_content=image_content,
+            )
+
+            created = self.shopify.create_draft_product(product)
+            synced_at = datetime.now(UTC)
+            snapshot.shopify_product_id = created.product_id
+            snapshot.shopify_product_handle = created.handle
+            snapshot.shopify_synced_at = synced_at
+            session.commit()
+            return self._shopify_sync_response(snapshot)
 
     def get_share_card(self, public_share_id: str) -> PublicShareCard:
         with self.database.session() as session:
@@ -457,6 +499,45 @@ class SharingService:
             artisan=card.artisan,
             published_at=card.published_at,
         )
+
+    def _shopify_sync_response(self, snapshot: CatalogSnapshot) -> ShopifyProductSync:
+        assert snapshot.shopify_product_id is not None
+        numeric_id = snapshot.shopify_product_id.rsplit("/", 1)[-1]
+        return ShopifyProductSync(
+            catalog_id=snapshot.id,
+            shopify_product_id=snapshot.shopify_product_id,
+            shopify_product_handle=snapshot.shopify_product_handle,
+            admin_url=f"https://{self.settings.shopify_store_domain}/admin/products/{numeric_id}",
+            status="draft",
+            synced_at=ensure_utc(snapshot.shopify_synced_at),
+        )
+
+    @staticmethod
+    def _shopify_tags(draft: Draft) -> list[str]:
+        candidates = [
+            *(draft.listing.tags if draft.listing is not None else []),
+            draft.craft_category,
+            draft.fields.material or "",
+            draft.fields.technique or "",
+            "KalaSetu",
+        ]
+        return list(dict.fromkeys(value.strip() for value in candidates if value.strip()))[:20]
+
+    @staticmethod
+    def _shopify_description(draft: Draft) -> str:
+        assert draft.listing is not None
+        description = draft.listing.description_en or draft.listing.description_hi or ""
+        details = [
+            ("Material", draft.fields.material),
+            ("Technique", draft.fields.technique),
+            ("Dimensions", draft.fields.dimensions),
+            ("Production time", f"{draft.fields.production_time_days} days"
+             if draft.fields.production_time_days is not None else None),
+        ]
+        detail_html = "".join(
+            f"<li><strong>{label}:</strong> {value}</li>" for label, value in details if value
+        )
+        return f"<p>{description}</p><ul>{detail_html}</ul>"
 
     @staticmethod
     def _encode_marketplace_cursor(created_at: datetime, catalog_id: str) -> str:

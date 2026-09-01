@@ -37,7 +37,7 @@ from app.schemas.catalog import (
     VoiceNote,
 )
 from app.schemas.operations import OperationResponse
-from app.schemas.sharing import ApprovalRequest, ApprovedCatalog
+from app.schemas.sharing import ApprovalRequest, ApprovedCatalog, ShopifyProductSync
 
 router = APIRouter(tags=["catalogue drafts"])
 
@@ -285,3 +285,16 @@ def approve_draft(
     idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
 ) -> ApprovedCatalog:
     return service.approve_draft(user, draft_id, body, str(idempotency_key))
+
+
+@router.post(
+    "/drafts/{draft_id}/shopify",
+    response_model=ShopifyProductSync,
+    responses=error_responses(400, 401, 404, 422, 500, 503),
+)
+def sync_draft_to_shopify(
+    draft_id: str,
+    user: CurrentUser,
+    service: SharingServiceDependency,
+) -> ShopifyProductSync:
+    return service.sync_draft_to_shopify(user, draft_id)

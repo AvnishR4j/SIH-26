@@ -41,7 +41,25 @@ class _FinalApprovalScreenState extends State<FinalApprovalScreen> {
     });
     try {
       final approved = await widget.controller.approveDraft();
+      String? shopifyError;
+      try {
+        await widget.controller.syncDraftToShopify(approved.draftId);
+      } on ApiException catch (error) {
+        shopifyError = error.message;
+      }
       if (!mounted) return;
+      if (shopifyError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                'कैटलॉग तैयार है, लेकिन Shopify पर भेजा नहीं जा सका। $shopifyError',
+                'Your catalogue is published, but Shopify could not be updated. $shopifyError',
+              ),
+            ),
+          ),
+        );
+      }
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => PublishedCatalogueScreen(

@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     catalogue_generation_provider: Literal["mock", "gemini"] = "mock"
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-2.5-flash"
+    shopify_enabled: bool = False
+    shopify_store_domain: str | None = None
+    shopify_client_id: str | None = None
+    shopify_client_secret: SecretStr | None = None
+    shopify_api_version: str = "2026-07"
+    shopify_timeout_seconds: int = Field(default=30, ge=1, le=120)
 
     @field_validator("whisper_model_size", "whisper_compute_type", "gemini_model")
     @classmethod
@@ -131,6 +137,18 @@ class Settings(BaseSettings):
         normalized = value.strip().rstrip("/")
         if not normalized.startswith(("http://", "https://")):
             raise ValueError("SUPABASE_URL must be an absolute HTTP(S) URL")
+        return normalized
+
+    @field_validator("shopify_store_domain")
+    @classmethod
+    def validate_shopify_store_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower().removeprefix("https://").rstrip("/")
+        if not normalized:
+            return None
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*\.myshopify\.com", normalized) is None:
+            raise ValueError("SHOPIFY_STORE_DOMAIN must be a *.myshopify.com domain")
         return normalized
 
     @field_validator("supabase_private_bucket", "supabase_public_bucket")
@@ -197,6 +215,17 @@ class Settings(BaseSettings):
             self.gemini_api_key is None or not self.gemini_api_key.get_secret_value().strip()
         ):
             raise ValueError("GEMINI_API_KEY is required when CATALOGUE_GENERATION_PROVIDER=gemini")
+        if self.shopify_enabled and (
+            self.shopify_store_domain is None
+            or self.shopify_client_id is None
+            or not self.shopify_client_id.strip()
+            or self.shopify_client_secret is None
+            or not self.shopify_client_secret.get_secret_value().strip()
+        ):
+            raise ValueError(
+                "SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, and SHOPIFY_CLIENT_SECRET are "
+                "required when SHOPIFY_ENABLED=true"
+            )
         return self
 
 

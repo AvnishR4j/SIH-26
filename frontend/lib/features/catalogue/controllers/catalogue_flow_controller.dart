@@ -213,6 +213,9 @@ class CatalogueFlowController {
     );
   }
 
+  Future<void> syncDraftToShopify(String draftId) =>
+      _apiClient.syncDraftToShopify(draftId);
+
   Future<ShareCard> getShareCard(String publicShareId) =>
       _apiClient.getShareCard(publicShareId);
 

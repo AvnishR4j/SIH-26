@@ -304,6 +304,9 @@ class CatalogSnapshot(Base):
     approval_note: Mapped[str | None] = mapped_column(String(1000))
     payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    shopify_product_id: Mapped[str | None] = mapped_column(String(120), unique=True)
+    shopify_product_handle: Mapped[str | None] = mapped_column(String(255))
+    shopify_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

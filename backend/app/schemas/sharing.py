@@ -33,6 +33,15 @@ class ApprovedCatalog(StrictModel):
     created_at: datetime
 
 
+class ShopifyProductSync(StrictModel):
+    catalog_id: str
+    shopify_product_id: str
+    shopify_product_handle: str | None
+    admin_url: str
+    status: Literal["draft"]
+    synced_at: datetime
+
+
 class PublicArtisan(StrictModel):
     display_name: str
     cluster: str | None

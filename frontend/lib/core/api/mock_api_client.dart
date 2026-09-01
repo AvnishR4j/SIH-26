@@ -457,6 +457,12 @@ class MockApiClient implements ApiClient {
   }
 
   @override
+  Future<void> syncDraftToShopify(String draftId) async {
+    await _latency();
+    _requireDraft(draftId);
+  }
+
+  @override
   Future<MarketplacePage> listMarketplaceCatalogues({
     int limit = 20,
     String? cursor,

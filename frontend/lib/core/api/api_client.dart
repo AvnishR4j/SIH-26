@@ -87,6 +87,8 @@ abstract interface class ApiClient {
 
   Future<ApprovedCatalogue> getPublishedCatalogue(String draftId);
 
+  Future<void> syncDraftToShopify(String draftId);
+
   Future<MarketplacePage> listMarketplaceCatalogues({
     int limit = 20,
     String? cursor,

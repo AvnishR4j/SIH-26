@@ -18,6 +18,7 @@ from app.main import app
 from app.services.auth import get_auth_service
 from app.services.catalog import get_catalog_service
 from app.services.sharing import get_sharing_service
+from app.services.shopify import ShopifyCreatedProduct, ShopifyDraftProduct
 
 client = TestClient(app)
 
@@ -488,6 +489,36 @@ def test_unknown_public_share_is_not_found() -> None:
     submit = submit_enquiry("share_unknown", enquiry_payload())
     assert read.status_code == submit.status_code == 404
     assert read.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_owner_can_sync_an_approved_catalogue_to_shopify_once() -> None:
+    class FakeShopify:
+        calls = 0
+
+        def create_draft_product(self, product: ShopifyDraftProduct) -> ShopifyCreatedProduct:
+            self.calls += 1
+            assert product.title == "Hand Embroidered Cotton Dupatta"
+            assert product.price_paise == 95_000
+            return ShopifyCreatedProduct(
+                product_id="gid://shopify/Product/123", handle="hand-embroidered-cotton-dupatta"
+            )
+
+    headers = login_headers()
+    draft = prepare_ready_draft(headers)
+    approve(headers, draft["id"])
+    user = get_auth_service().authenticate(headers["Authorization"].removeprefix("Bearer "))
+    fake_shopify = FakeShopify()
+    service = get_sharing_service()
+    service.shopify = fake_shopify  # type: ignore[assignment]
+
+    first = service.sync_draft_to_shopify(user, draft["id"])
+    second = service.sync_draft_to_shopify(user, draft["id"])
+
+    assert first.catalog_id.startswith("cat_")
+    assert first.shopify_product_id == "gid://shopify/Product/123"
+    assert first.shopify_product_handle == "hand-embroidered-cotton-dupatta"
+    assert second == first
+    assert fake_shopify.calls == 1
 
 
 def test_marketplace_lists_only_safe_approved_catalogues_with_pagination() -> None:
