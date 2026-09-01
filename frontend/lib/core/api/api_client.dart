@@ -92,6 +92,8 @@ abstract interface class ApiClient {
     String? cursor,
   });
 
+  Future<void> deleteMarketplaceCatalogue(String publicShareId);
+
   Future<ShareCard> getShareCard(String publicShareId);
 
   Future<BuyerEnquiry> submitEnquiry(

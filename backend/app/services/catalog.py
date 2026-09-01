@@ -180,12 +180,21 @@ class CatalogService:
 
     def delete_draft(self, user: UserRecord, draft_id: str) -> None:
         with self._lock, self.database.session() as session, session.begin():
-            self._owned_draft(session, user.id, draft_id)
+            if user.role == "admin":
+                row = session.scalar(
+                    select(CatalogDraft).where(
+                        CatalogDraft.id == draft_id,
+                        CatalogDraft.is_deleted.is_(False),
+                    )
+                )
+                if row is None:
+                    raise ApiError(404, "NOT_FOUND", "The draft was not found.")
+            else:
+                self._owned_draft(session, user.id, draft_id)
             session.execute(
                 update(CatalogDraft)
                 .where(
                     CatalogDraft.id == draft_id,
-                    CatalogDraft.owner_id == user.id,
                     CatalogDraft.is_deleted.is_(False),
                 )
                 .values(is_deleted=True, updated_at=datetime.now(UTC))
@@ -194,7 +203,6 @@ class CatalogService:
                 update(CatalogSnapshot)
                 .where(
                     CatalogSnapshot.draft_id == draft_id,
-                    CatalogSnapshot.owner_id == user.id,
                 )
                 .values(is_deleted=True)
             )

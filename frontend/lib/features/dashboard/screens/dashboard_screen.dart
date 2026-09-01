@@ -497,6 +497,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: ExploreScreen(
                 apiClient: widget.apiClient,
                 language: _language,
+                isAdmin: _profile.role == 'admin',
                 newCatalogueFlow: _controller.newCatalogueFlow,
               ),
             ),

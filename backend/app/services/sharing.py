@@ -169,7 +169,6 @@ class SharingService:
                             created_at=now,
                         )
                     )
-                    return response
             except IntegrityError:
                 if published_key is not None:
                     self.storage.delete(published_key)
@@ -183,6 +182,30 @@ class SharingService:
                 if published_key is not None:
                     self.storage.delete(published_key)
                 raise
+        return response
+
+    def delete_marketplace_catalogue(self, user: UserRecord, public_share_id: str) -> None:
+        if user.role != "admin":
+            raise ApiError(403, "FORBIDDEN", "Only an admin can delete marketplace catalogues.")
+        with self._lock, self.database.session() as session, session.begin():
+            snapshot = session.scalar(
+                select(CatalogSnapshot).where(
+                    CatalogSnapshot.public_share_id == public_share_id,
+                    CatalogSnapshot.is_deleted.is_(False),
+                )
+            )
+            if snapshot is None:
+                raise ApiError(404, "NOT_FOUND", "The catalogue was not found.")
+            now = datetime.now(UTC)
+            snapshot.is_deleted = True
+            session.execute(
+                update(CatalogDraft)
+                .where(
+                    CatalogDraft.id == snapshot.draft_id,
+                    CatalogDraft.is_deleted.is_(False),
+                )
+                .values(is_deleted=True, updated_at=now)
+            )
 
     def get_approved_catalog(self, user: UserRecord, draft_id: str) -> ApprovedCatalog:
         with self.database.session() as session:

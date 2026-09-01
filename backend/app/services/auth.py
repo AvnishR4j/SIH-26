@@ -336,8 +336,7 @@ class AuthService:
             sha256,
         ).hexdigest()
 
-    @staticmethod
-    def _to_record(user: User) -> UserRecord:
+    def _to_record(self, user: User) -> UserRecord:
         accepted_at = (
             ensure_utc(user.media_processing_accepted_at)
             if user.media_processing_accepted_at is not None
@@ -347,7 +346,7 @@ class AuthService:
             id=user.id,
             phone=user.phone,
             name=user.name,
-            role=user.role,
+            role=("admin" if self.settings.admin_phone_e164 == user.phone else user.role),
             preferred_language=user.preferred_language,
             cluster=user.cluster,
             craft_categories=list(user.craft_categories),

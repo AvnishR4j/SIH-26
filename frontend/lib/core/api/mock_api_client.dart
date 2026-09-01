@@ -490,6 +490,25 @@ class MockApiClient implements ApiClient {
   }
 
   @override
+  Future<void> deleteMarketplaceCatalogue(String publicShareId) async {
+    await _latency();
+    final approved = _approvals.values
+        .where((catalogue) => catalogue.publicShareId == publicShareId)
+        .firstOrNull;
+    if (approved == null) {
+      throw const ApiException(
+        code: 'NOT_FOUND',
+        message: 'Published catalogue not found.',
+      );
+    }
+    _shareCards.remove(publicShareId);
+    _drafts.remove(approved.draftId);
+    _approvals.removeWhere(
+      (_, catalogue) => catalogue.publicShareId == publicShareId,
+    );
+  }
+
+  @override
   Future<ShareCard> getShareCard(String publicShareId) async {
     await _latency();
     final card = _shareCards[publicShareId];

@@ -600,6 +600,11 @@ class RealApiClient implements ApiClient {
   }
 
   @override
+  Future<void> deleteMarketplaceCatalogue(String publicShareId) async {
+    await _request('DELETE', 'marketplace/catalogues/$publicShareId');
+  }
+
+  @override
   Future<ShareCard> getShareCard(String id) async {
     final v = await _request('GET', 'share/$id', auth: false);
     final a = (v['artisan'] as Map).cast<String, dynamic>();

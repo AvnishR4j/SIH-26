@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     otp_max_requests_per_15_minutes: int = 5
     otp_idempotency_ttl_seconds: int = 60
     idempotency_ttl_seconds: int = 86400
+    admin_phone_e164: str | None = None
     enquiry_max_per_hour_per_buyer: int = Field(default=5, ge=1, le=100)
     dev_otp: str | None = "123456"
     media_consent_policy_version: str = "2026-08-29"
@@ -87,6 +88,18 @@ class Settings(BaseSettings):
         normalized = value.rstrip("/")
         if not normalized.startswith(("http://", "https://")):
             raise ValueError("MEDIA_URL_BASE must be an absolute HTTP(S) URL")
+        return normalized
+
+    @field_validator("admin_phone_e164")
+    @classmethod
+    def validate_admin_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not re.fullmatch(r"\+[1-9]\d{7,14}", normalized):
+            raise ValueError("ADMIN_PHONE_E164 must be an E.164 phone number.")
         return normalized
 
     @field_validator("public_api_base_url", "public_share_web_base_url")

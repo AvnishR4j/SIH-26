@@ -12,7 +12,7 @@ from PIL import Image
 from sqlalchemy import func, select
 
 from app.core.config import get_settings
-from app.db.models import BuyerEnquiry, CatalogSnapshot, Operation
+from app.db.models import BuyerEnquiry, CatalogSnapshot, Operation, User
 from app.db.session import get_database
 from app.main import app
 from app.services.auth import get_auth_service
@@ -541,6 +541,33 @@ def test_delete_hides_an_approved_catalogue_from_public_surfaces() -> None:
     marketplace = client.get("/api/v1/marketplace/catalogues")
     assert marketplace.status_code == 200
     assert marketplace.json()["items"] == []
+
+
+def test_admin_can_remove_any_marketplace_catalogue_but_artisans_cannot() -> None:
+    owner_headers = login_headers("+919999999991")
+    draft = prepare_ready_draft(owner_headers)
+    approved = approve(owner_headers, draft["id"])
+    assert approved.status_code == 201
+    share_id = approved.json()["public_share_id"]
+
+    other_headers = login_headers("+919999999992")
+    denied = client.delete(f"/api/v1/marketplace/catalogues/{share_id}", headers=other_headers)
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "FORBIDDEN"
+
+    with get_database().session() as session, session.begin():
+        admin = session.scalar(select(User).where(User.phone == "+919999999992"))
+        assert admin is not None
+        admin.role = "admin"
+
+    deleted = client.delete(f"/api/v1/marketplace/catalogues/{share_id}", headers=other_headers)
+    assert deleted.status_code == 204
+    assert client.get(f"/api/v1/share/{share_id}").status_code == 404
+    assert client.get("/api/v1/marketplace/catalogues").json()["items"] == []
+    assert (
+        client.get(f"/api/v1/catalog/drafts/{draft['id']}", headers=owner_headers).status_code
+        == 404
+    )
 
 
 def test_openapi_documents_approval_share_and_enquiry_contracts() -> None:

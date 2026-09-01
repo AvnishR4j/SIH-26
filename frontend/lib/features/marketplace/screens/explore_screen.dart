@@ -14,11 +14,13 @@ class ExploreScreen extends StatefulWidget {
     super.key,
     required this.apiClient,
     required this.language,
+    required this.isAdmin,
     required this.newCatalogueFlow,
   });
 
   final ApiClient apiClient;
   final AppLanguage language;
+  final bool isAdmin;
   final CatalogueFlowController Function() newCatalogueFlow;
 
   @override
@@ -97,6 +99,49 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ),
       );
+
+  Future<void> _delete(MarketplaceCatalogue catalogue) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t('कैटलॉग हटाएं?', 'Delete catalogue?')),
+        content: Text(
+          _t(
+            'यह पोस्ट खोज और खरीदार पेज से हट जाएगा।',
+            'This post will be removed from Explore and buyer pages.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(_t('रद्द करें', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(_t('हटाएं', 'Delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.apiClient.deleteMarketplaceCatalogue(
+        catalogue.publicShareId,
+      );
+      if (!mounted) return;
+      setState(
+        () => _items = _items.where((item) => item != catalogue).toList(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('कैटलॉग हटा दिया गया', 'Catalogue deleted'))),
+      );
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +222,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               _MarketplaceCard(
                 catalogue: catalogue,
                 onTap: () => _open(catalogue),
+                onDelete: widget.isAdmin ? () => _delete(catalogue) : null,
               ),
               const SizedBox(height: 14),
             ],
@@ -201,10 +247,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 class _MarketplaceCard extends StatelessWidget {
-  const _MarketplaceCard({required this.catalogue, required this.onTap});
+  const _MarketplaceCard({
+    required this.catalogue,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final MarketplaceCatalogue catalogue;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -274,10 +325,31 @@ class _MarketplaceCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 43, right: 4),
-                child: Icon(Icons.chevron_right, color: AppColors.mutedText),
-              ),
+              if (onDelete != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 36, right: 2),
+                  child: PopupMenuButton<String>(
+                    tooltip: 'Delete catalogue',
+                    onSelected: (_) => onDelete!(),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline),
+                            SizedBox(width: 10),
+                            Text('Delete catalogue'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.only(top: 43, right: 4),
+                  child: Icon(Icons.chevron_right, color: AppColors.mutedText),
+                ),
             ],
           ),
         ),
