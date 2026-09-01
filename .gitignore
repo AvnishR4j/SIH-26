@@ -33,3 +33,7 @@ build/
 media/
 uploads/
 KalaSetu_AI_SIH_Pitch/
+
+# Local ML training inputs and generated model artifacts
+backend/data/raw/
+backend/models/
