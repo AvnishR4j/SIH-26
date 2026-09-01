@@ -7,6 +7,7 @@ import '../../../core/media/media_capture_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/language_switch.dart';
+import '../../../shared/widgets/product_image.dart';
 import '../../auth/models/auth_models.dart';
 import '../../catalogue/controllers/catalogue_flow_controller.dart';
 import '../../catalogue/models/catalogue_models.dart';
@@ -479,6 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     draft.titleHi ??
                                     strings.newCatalogue),
                           statusLabel: strings.draftStatus(draft.status),
+                          thumbnailUrl: draft.thumbnailUrl,
                           language: _language,
                           isOpening: _openingDraftId == draft.id,
                           isDeleting: _deletingDraftId == draft.id,
@@ -523,6 +525,7 @@ class _DraftRow extends StatelessWidget {
   const _DraftRow({
     required this.title,
     required this.statusLabel,
+    required this.thumbnailUrl,
     required this.language,
     required this.isOpening,
     required this.isDeleting,
@@ -532,6 +535,7 @@ class _DraftRow extends StatelessWidget {
 
   final String title;
   final String statusLabel;
+  final String? thumbnailUrl;
   final AppLanguage language;
   final bool isOpening;
   final bool isDeleting;
@@ -550,17 +554,16 @@ class _DraftRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
+            SizedBox(
               width: 56,
               height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.image_outlined,
-                color: AppColors.mutedText,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ProductImage(networkUrl: thumbnailUrl, borderRadius: 7),
               ),
             ),
             const SizedBox(width: 14),
