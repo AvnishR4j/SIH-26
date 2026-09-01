@@ -21,7 +21,7 @@ void main() {
   testWidgets('switches the login copy between Hindi and English', (
     tester,
   ) async {
-    await tester.pumpWidget(const KalaSetuApp());
+    await tester.pumpWidget(KalaSetuApp(apiClient: MockApiClient()));
     await tester.pumpAndSettle();
 
     expect(find.text('अपने फोन नंबर से जुड़ें'), findsOneWidget);

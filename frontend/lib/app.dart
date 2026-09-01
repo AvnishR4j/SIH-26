@@ -60,9 +60,14 @@ class _KalaSetuAppState extends State<KalaSetuApp> {
 
   ApiClient _configuredApiClient() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
-    return baseUrl.isEmpty
-        ? MockApiClient()
-        : RealApiClient(baseUrl: Uri.parse(baseUrl));
+    const useMockApi = bool.fromEnvironment('USE_MOCK_API');
+    if (useMockApi) return MockApiClient();
+
+    // Never silently display fixture data in a normal app build.
+    final resolvedBaseUrl = baseUrl.isEmpty
+        ? 'http://127.0.0.1:8000/api/v1'
+        : baseUrl;
+    return RealApiClient(baseUrl: Uri.parse(resolvedBaseUrl));
   }
 
   @override
