@@ -23,6 +23,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 RAW_ARCHIVE = BACKEND_DIR / "data" / "raw" / "online_retail_ii.zip"
+RAW_WORKBOOK = BACKEND_DIR / "data" / "raw" / "online_retail_ii.xlsx"
 MODEL_DIR = BACKEND_DIR / "models"
 MODEL_PATH = MODEL_DIR / "generic_retail_price_prototype.pkl"
 REPORT_PATH = MODEL_DIR / "generic_retail_price_prototype.json"
@@ -30,11 +31,15 @@ RANDOM_STATE = 42
 MAX_TRAINING_ROWS = 250_000
 
 
-def load_transactions(archive_path: Path) -> pd.DataFrame:
+def load_transactions(archive_path: Path, workbook_path: Path) -> pd.DataFrame:
+    if workbook_path.exists():
+        return pd.read_excel(workbook_path, sheet_name=None).pipe(
+            lambda sheets: pd.concat(sheets.values(), ignore_index=True)
+        )
     if not archive_path.exists():
         raise FileNotFoundError(
-            "Download the official UCI archive to "
-            f"{archive_path} before running this script."
+            "Download the official UCI archive or workbook to "
+            f"{archive_path.parent} before running this script."
         )
     with ZipFile(archive_path) as archive:
         spreadsheets = [name for name in archive.namelist() if name.lower().endswith(".xlsx")]
@@ -45,19 +50,20 @@ def load_transactions(archive_path: Path) -> pd.DataFrame:
 
 
 def prepare_dataset(transactions: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    required = {"Description", "Quantity", "UnitPrice", "Country"}
+    price_column = "UnitPrice" if "UnitPrice" in transactions.columns else "Price"
+    required = {"Description", "Quantity", price_column, "Country"}
     missing = required.difference(transactions.columns)
     if missing:
         raise ValueError(f"Dataset is missing expected columns: {sorted(missing)}")
 
     cleaned = transactions.dropna(
-        subset=["Description", "Quantity", "UnitPrice", "Country"]
+        subset=["Description", "Quantity", price_column, "Country"]
     ).copy()
-    cleaned = cleaned[(cleaned["Quantity"] > 0) & (cleaned["UnitPrice"] > 0)]
+    cleaned = cleaned[(cleaned["Quantity"] > 0) & (cleaned[price_column] > 0)]
     cleaned["description"] = cleaned["Description"].astype(str).str.strip().str.lower()
     cleaned["country"] = cleaned["Country"].astype(str).str.strip()
     cleaned["quantity"] = cleaned["Quantity"].astype(float)
-    target = cleaned["UnitPrice"].astype(float)
+    target = cleaned[price_column].astype(float)
     features = cleaned[["description", "country", "quantity"]]
     if len(features) > MAX_TRAINING_ROWS:
         sampled = features.sample(n=MAX_TRAINING_ROWS, random_state=RANDOM_STATE)
@@ -66,7 +72,7 @@ def prepare_dataset(transactions: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 
 def main() -> None:
-    transactions = load_transactions(RAW_ARCHIVE)
+    transactions = load_transactions(RAW_ARCHIVE, RAW_WORKBOOK)
     features, target = prepare_dataset(transactions)
     train_features, test_features, train_target, test_target = train_test_split(
         features, target, test_size=0.2, random_state=RANDOM_STATE

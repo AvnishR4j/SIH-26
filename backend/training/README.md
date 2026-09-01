@@ -11,6 +11,8 @@ the cost-based minimum price or be labelled as a live artisan-market price.
 
 1. Install training-only dependencies with `python -m pip install -r requirements-ml.txt`.
 2. Download the official archive into `backend/data/raw/online_retail_ii.zip`.
+   An equivalent `.xlsx` workbook may instead be placed at
+   `backend/data/raw/online_retail_ii.xlsx` when a trusted transfer mirror is needed.
 3. Run `python training/train_retail_price_prototype.py` from `backend/`.
 4. The generated model report and artifact are written to `backend/models/`.
 
