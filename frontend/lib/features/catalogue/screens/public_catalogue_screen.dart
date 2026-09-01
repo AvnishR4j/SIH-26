@@ -7,6 +7,7 @@ import '../../../core/utils/idempotency_key.dart';
 import '../../../core/utils/money.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/product_image.dart';
+import '../../profile/models/profile_models.dart';
 import '../controllers/catalogue_flow_controller.dart';
 import '../models/catalogue_models.dart';
 
@@ -34,6 +35,7 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
   final _message = TextEditingController();
   late String _idempotencyKey;
   ShareCard? _card;
+  ArtisanProfile? _buyerProfile;
   bool _loading = true;
   bool _submitting = false;
   bool _consent = false;
@@ -66,7 +68,21 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
     });
     try {
       final card = await widget.controller.getShareCard(widget.publicShareId);
-      if (mounted) setState(() => _card = card);
+      ArtisanProfile? profile;
+      try {
+        profile = await widget.controller.getCurrentProfile();
+      } on ApiException {
+        // Shared links can be opened without a signed-in KalaSetu profile.
+      }
+      if (!mounted) return;
+      setState(() {
+        _card = card;
+        _buyerProfile = profile;
+        if (profile != null) {
+          _name.text = profile.name;
+          _phone.text = profile.phone;
+        }
+      });
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
@@ -94,8 +110,8 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
       await widget.controller.submitEnquiry(
         widget.publicShareId,
         BuyerEnquiryInput(
-          buyerName: _name.text.trim(),
-          buyerPhone: _phone.text.trim(),
+          buyerName: _buyerProfile?.name.trim() ?? _name.text.trim(),
+          buyerPhone: _buyerProfile?.phone.trim() ?? _phone.text.trim(),
           quantityRequested: int.parse(_quantity.text),
           message: _message.text.trim().isEmpty ? null : _message.text.trim(),
           consentToContact: _consent,
@@ -253,6 +269,7 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
   }
 
   Widget _enquiryForm() {
+    final profile = _buyerProfile;
     return Form(
       key: _formKey,
       child: Column(
@@ -263,29 +280,44 @@ class _PublicCatalogueScreenState extends State<PublicCatalogueScreen> {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            controller: _name,
-            decoration: InputDecoration(labelText: _t('आपका नाम', 'Your name')),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? _t('नाम डालें', 'Enter your name')
-                : null,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              labelText: _t('फोन नंबर', 'Phone number'),
+          if (profile != null) ...[
+            Text(
+              _t('पूछताछ भेजी जाएगी', 'Your enquiry will be sent as'),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            validator: (value) =>
-                !RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value?.trim() ?? '')
-                ? _t(
-                    '+91 के साथ सही नंबर डालें',
-                    'Enter a valid number with country code',
-                  )
-                : null,
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              '${profile.name} | ${profile.phone}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+          ] else ...[
+            TextFormField(
+              controller: _name,
+              decoration: InputDecoration(
+                labelText: _t('आपका नाम', 'Your name'),
+              ),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? _t('नाम डालें', 'Enter your name')
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: _t('फोन नंबर', 'Phone number'),
+              ),
+              validator: (value) =>
+                  !RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value?.trim() ?? '')
+                  ? _t(
+                      '+91 के साथ सही नंबर डालें',
+                      'Enter a valid number with country code',
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 12),
+          ],
           TextFormField(
             controller: _quantity,
             keyboardType: TextInputType.number,

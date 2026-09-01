@@ -219,6 +219,8 @@ class CatalogueFlowController {
   Future<ShareCard> getShareCard(String publicShareId) =>
       _apiClient.getShareCard(publicShareId);
 
+  Future<ArtisanProfile> getCurrentProfile() => _apiClient.getMe();
+
   Future<BuyerEnquiry> submitEnquiry(
     String publicShareId,
     BuyerEnquiryInput input, {
