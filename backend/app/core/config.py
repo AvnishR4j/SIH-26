@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     image_enhancement_max_side: int = Field(default=4096, ge=512, le=8192)
     rembg_model: Literal["u2net", "u2netp", "isnet-general-use"] = "u2net"
     rembg_model_cache_dir: Path = Path("./models/rembg")
+    image_quality_gate_enabled: bool = True
+    image_quality_min_side: int = Field(default=320, ge=64, le=2048)
+    image_quality_min_blur_score: float = Field(default=45.0, ge=1.0, le=1000.0)
+    image_quality_min_contrast: float = Field(default=14.0, ge=1.0, le=100.0)
     speech_provider: Literal["faster_whisper"] = "faster_whisper"
     whisper_model_size: str = "medium"
     whisper_device: Literal["cpu", "cuda"] = "cpu"

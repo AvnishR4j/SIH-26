@@ -119,6 +119,9 @@ class AppStrings {
   String get photoUploadFailed => isHindi
       ? 'फोटो अपलोड नहीं हो सका। फिर कोशिश करें।'
       : 'The photo could not be uploaded. Try again.';
+  String get photoNeedsRetake => isHindi
+      ? 'फोटो साफ़ नहीं है। अच्छी रोशनी में पूरे उत्पाद की साफ़ फोटो दोबारा लें।'
+      : 'This photo is not clear enough. Retake the full product in good light.';
 
   String get productDescription =>
       isHindi ? 'उत्पाद का वर्णन' : 'Product description';

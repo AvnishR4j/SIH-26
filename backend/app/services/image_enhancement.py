@@ -59,10 +59,15 @@ class RembgImageEnhancer:
     def enhance(self, content: bytes, background: str, crop_style: str) -> bytes:
         image = _fit_max_side(_decode_rgb(content), self.max_side)
         if background == "neutral":
-            image = self._remove_background(image)
-        image = self._correct_lighting_and_detail(image)
-        if crop_style == "marketplace_square":
-            image = _square_pad(image, (245, 245, 245))
+            foreground = self._remove_background(image)
+            foreground = self._correct_lighting_and_detail(foreground)
+            if crop_style == "marketplace_square":
+                foreground = _frame_foreground(foreground, target_side=max(image.size))
+            image = _composite_on_neutral(foreground)
+        else:
+            image = self._correct_lighting_and_detail(image)
+            if crop_style == "marketplace_square":
+                image = _square_pad(image, (245, 245, 245))
         return _jpeg_bytes(image)
 
     def _remove_background(self, image: Image.Image) -> Image.Image:
@@ -81,8 +86,17 @@ class RembgImageEnhancer:
             if not isinstance(result, Image.Image):
                 raise TypeError("Background remover did not return an image")
             foreground = result.convert("RGBA")
-            canvas = Image.new("RGBA", foreground.size, (245, 245, 245, 255))
-            return Image.alpha_composite(canvas, foreground).convert("RGB")
+            alpha = np.array(foreground.getchannel("A"), dtype=np.uint8)
+            # Low-alpha pixels are almost always background shadows or mask noise.
+            alpha[alpha < 28] = 0
+            foreground.putalpha(Image.fromarray(alpha))
+            if foreground.getbbox() is None:
+                raise ApiError(
+                    422,
+                    "IMAGE_SUBJECT_NOT_CLEAR",
+                    "We could not clearly find the product. Retake the photo with the product clearly visible.",
+                )
+            return foreground
         except ApiError:
             raise
         except Exception as error:
@@ -124,7 +138,63 @@ class RembgImageEnhancer:
         corrected_rgb = cv2.cvtColor(corrected, cv2.COLOR_LAB2RGB)
         blurred = cv2.GaussianBlur(corrected_rgb, (0, 0), sigmaX=1.0)
         sharpened = cv2.addWeighted(corrected_rgb, 1.08, blurred, -0.08, 0)
-        return Image.fromarray(sharpened)
+        corrected = Image.fromarray(sharpened)
+        if image.mode != "RGBA":
+            return corrected
+        # Keep the background transparent while correcting only the extracted product.
+        corrected.putalpha(image.getchannel("A"))
+        return corrected
+
+
+def validate_product_photo(image: Image.Image, settings: Settings) -> None:
+    """Reject technically unusable photos before they enter a catalogue draft."""
+    if not settings.image_quality_gate_enabled:
+        return
+
+    normalized = ImageOps.exif_transpose(image).convert("RGB")
+    if min(normalized.size) < settings.image_quality_min_side:
+        raise ApiError(
+            422,
+            "IMAGE_TOO_SMALL",
+            "Retake the photo closer to the product so it is clear enough to use.",
+            {"min_side": settings.image_quality_min_side},
+        )
+
+    rgb = np.asarray(normalized, dtype=np.uint8)
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    contrast = float(gray.std())
+    low, high = np.percentile(gray, (2, 98))
+    if contrast < settings.image_quality_min_contrast or high - low < 35:
+        raise ApiError(
+            422,
+            "IMAGE_NOT_CLEAR",
+            "This photo has too little visible detail. Use a clear background and retake it.",
+        )
+
+    average_light = float(gray.mean())
+    if average_light < 38:
+        raise ApiError(
+            422,
+            "IMAGE_TOO_DARK",
+            "This photo is too dark. Move the product into better light and retake it.",
+        )
+    if average_light > 228:
+        raise ApiError(
+            422,
+            "IMAGE_TOO_BRIGHT",
+            "This photo is too bright. Avoid strong glare and retake it.",
+        )
+
+    analysis = _fit_max_side(normalized, 1024)
+    analysis_gray = cv2.cvtColor(np.asarray(analysis), cv2.COLOR_RGB2GRAY)
+    blur_score = float(cv2.Laplacian(analysis_gray, cv2.CV_64F).var())
+    if blur_score < settings.image_quality_min_blur_score:
+        raise ApiError(
+            422,
+            "IMAGE_BLURRY",
+            "This photo is blurry. Hold the camera steady, focus on the product, and retake it.",
+            {"blur_score": round(blur_score, 1)},
+        )
 
 
 def _decode_rgb(content: bytes) -> Image.Image:
@@ -140,6 +210,38 @@ def _square_pad(image: Image.Image, fill: tuple[int, int, int]) -> Image.Image:
         method=Image.Resampling.LANCZOS,
         color=fill,
     )
+
+
+def _frame_foreground(foreground: Image.Image, *, target_side: int) -> Image.Image:
+    """Centre the extracted product with a consistent breathing room in a square frame."""
+    alpha = foreground.getchannel("A")
+    bounds = alpha.getbbox()
+    if bounds is None:
+        raise ApiError(
+            422,
+            "IMAGE_SUBJECT_NOT_CLEAR",
+            "We could not clearly find the product. Retake the photo with the product clearly visible.",
+        )
+    product = foreground.crop(bounds)
+    product_width, product_height = product.size
+    # The product uses about 78% of the output frame, leaving a clean sales-photo margin.
+    target_product_side = max(1, round(target_side * 0.78))
+    scale = target_product_side / max(product_width, product_height)
+    resized_size = (
+        max(1, round(product_width * scale)),
+        max(1, round(product_height * scale)),
+    )
+    product = product.resize(resized_size, Image.Resampling.LANCZOS)
+    product_width, product_height = product.size
+    frame = Image.new("RGBA", (target_side, target_side), (0, 0, 0, 0))
+    offset = ((target_side - product_width) // 2, (target_side - product_height) // 2)
+    frame.alpha_composite(product, offset)
+    return frame
+
+
+def _composite_on_neutral(foreground: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", foreground.size, (245, 245, 245, 255))
+    return Image.alpha_composite(canvas, foreground).convert("RGB")
 
 
 def _fit_max_side(image: Image.Image, max_side: int) -> Image.Image:

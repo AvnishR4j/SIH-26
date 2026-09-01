@@ -35,6 +35,7 @@ from app.services.image_enhancement import (
     ImageEnhancer,
     create_image_enhancer,
     get_image_enhancer,
+    validate_product_photo,
 )
 from app.services.media_urls import refresh_draft_image_urls, refresh_image_urls
 from app.storage.base import MediaStorage
@@ -549,6 +550,17 @@ class MediaService:
                 "UNSUPPORTED_MEDIA_TYPE",
                 "Upload a valid JPEG, PNG, or WebP image.",
             )
+        try:
+            with Image.open(BytesIO(content)) as decoded:
+                validate_product_photo(decoded, self.settings)
+        except ApiError:
+            raise
+        except (UnidentifiedImageError, OSError, SyntaxError) as error:
+            raise ApiError(
+                415,
+                "UNSUPPORTED_MEDIA_TYPE",
+                "Upload a valid JPEG, PNG, or WebP image.",
+            ) from error
         return IMAGE_FORMATS[image_format]
 
     def _require_current_consent(self, user: UserRecord) -> None:

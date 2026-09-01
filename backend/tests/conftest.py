@@ -17,6 +17,9 @@ os.environ.setdefault("MEDIA_LOCAL_DIR", str(TEST_MEDIA_PATH))
 os.environ.setdefault("MEDIA_URL_BASE", "http://testserver/media")
 # Keep API-flow tests deterministic even when a developer configures Gemini locally.
 os.environ["CATALOGUE_GENERATION_PROVIDER"] = "mock"
+# API tests use tiny synthetic images; production keeps this gate enabled.
+os.environ["IMAGE_QUALITY_GATE_ENABLED"] = "false"
+os.environ["IMAGE_ENHANCEMENT_PROVIDER"] = "mock"
 
 
 def pytest_sessionfinish() -> None:

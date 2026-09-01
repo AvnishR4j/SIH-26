@@ -155,6 +155,28 @@ def test_upload_rejects_excessive_decoded_dimensions_before_persistence() -> Non
     assert error.value.code == "UPLOAD_TOO_LARGE"
 
 
+@pytest.mark.parametrize(
+    ("image", "expected_code"),
+    [
+        (Image.new("RGB", (640, 480), (8, 8, 8)), "IMAGE_NOT_CLEAR"),
+        (Image.new("RGB", (640, 480), (250, 250, 250)), "IMAGE_NOT_CLEAR"),
+    ],
+)
+def test_upload_quality_gate_rejects_unusable_images(
+    image: Image.Image, expected_code: str
+) -> None:
+    settings = get_settings().model_copy(update={"image_quality_gate_enabled": True})
+    service = MediaService(settings, get_database(), get_media_storage())
+    output = BytesIO()
+    image.save(output, format="JPEG")
+
+    with pytest.raises(ApiError) as error:
+        service._validate_image(output.getvalue())
+
+    assert error.value.status_code == 422
+    assert error.value.code == expected_code
+
+
 def test_upload_retries_and_primary_selection_are_deterministic() -> None:
     headers = login_headers()
     draft = create_draft(headers)

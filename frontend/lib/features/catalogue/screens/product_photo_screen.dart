@@ -136,6 +136,12 @@ class _ProductPhotoScreenState extends State<ProductPhotoScreen> {
       'UPLOAD_TOO_LARGE' => strings.photoTooLarge,
       'UNSUPPORTED_MEDIA_TYPE' => strings.unsupportedPhoto,
       'STORAGE_UNAVAILABLE' => strings.photoStorageFailed,
+      'IMAGE_TOO_SMALL' ||
+      'IMAGE_NOT_CLEAR' ||
+      'IMAGE_TOO_DARK' ||
+      'IMAGE_TOO_BRIGHT' ||
+      'IMAGE_BLURRY' ||
+      'IMAGE_SUBJECT_NOT_CLEAR' => strings.photoNeedsRetake,
       _ => strings.photoUploadFailed,
     };
   }
