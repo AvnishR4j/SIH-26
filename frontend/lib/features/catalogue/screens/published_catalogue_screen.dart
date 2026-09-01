@@ -45,7 +45,8 @@ class PublishedCatalogueScreen extends StatelessWidget {
     );
   }
 
-  void _home(BuildContext context) => Navigator.of(context).pop();
+  void _home(BuildContext context) =>
+      Navigator.of(context).popUntil((route) => route.isFirst);
 
   @override
   Widget build(BuildContext context) {
