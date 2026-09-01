@@ -10,7 +10,8 @@ class HomeController {
   final MediaCaptureService media;
 
   Future<List<DraftSummary>> loadRecentDrafts() async {
-    final page = await _apiClient.listDrafts(limit: 3);
+    // Home remains a scrollable recent-catalogue list, so older work is not hidden.
+    final page = await _apiClient.listDrafts(limit: 50);
     return page.items;
   }
 
